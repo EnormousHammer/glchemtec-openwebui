@@ -25,6 +25,8 @@ services:
         value: "true"
       - key: ENABLE_LOGIN_FORM
         value: "true"
+      - key: ENABLE_PASSWORD_AUTH
+        value: "true"
       - key: WEBUI_URL
         fromService:
           type: web
@@ -47,11 +49,9 @@ services:
       - key: MICROSOFT_OAUTH_SCOPE
         value: "openid email profile"
       - key: WEBUI_ADMIN_EMAIL
-        value: "haron@glchemtec.com"
+        value: "haron@glchemtec.ca"
       - key: WEBUI_ADMIN_PASSWORD
         sync: false
-      - key: ENABLE_SIGNUP
-        value: "false"
       # Document/File Processing Settings
       - key: RAG_EMBEDDING_MODEL
         value: "text-embedding-3-small"
@@ -65,6 +65,5 @@ services:
         value: "10"
       - key: USER_PERMISSIONS_CHAT_FILE_UPLOAD
         value: "true"
-      # Default user role (not admin for new users)
       - key: DEFAULT_USER_ROLE
         value: "user"
