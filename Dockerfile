@@ -5,16 +5,37 @@ FROM ghcr.io/open-webui/open-webui:main
 USER root
 
 # Install system dependencies for PDF/PPT processing, audio, and more
+# Includes EMF/WMF support for better PowerPoint image rendering
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     poppler-utils \
     libreoffice \
+    libreoffice-writer \
+    libreoffice-impress \
+    libreoffice-draw \
     tesseract-ocr \
     tesseract-ocr-eng \
     ffmpeg \
     libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
+    # EMF/WMF and vector graphics support
+    libwmf-dev \
+    libwmf-bin \
+    libwmf0.2-7 \
+    imagemagick \
+    ghostscript \
+    # Better font support for accurate rendering
+    fonts-liberation \
+    fonts-liberation2 \
+    fonts-dejavu \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    fonts-noto \
+    # SVG support
+    librsvg2-bin \
+    && rm -rf /var/lib/apt/lists/* \
+    # Configure ImageMagick to allow PDF processing
+    && sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
 
 # Install Python libraries for full document processing (ChatGPT-like capabilities)
 RUN pip3 install --no-cache-dir \
