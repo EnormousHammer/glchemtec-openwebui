@@ -71,7 +71,9 @@ RUN pip3 install --no-cache-dir \
     python-magic \
     # Archive handling
     rarfile \
-    py7zr
+    py7zr \
+    # PDF generation for exports
+    reportlab
 
 # Create directories with proper permissions for NLTK and other data
 RUN mkdir -p /home/user/nltk_data && \
