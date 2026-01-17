@@ -26,6 +26,9 @@ RUN pip3 install --no-cache-dir \
     beautifulsoup4 \
     lxml
 
+# Fix permissions for secret key file if it exists
+RUN chmod 666 /app/.webui_secret_key 2>/dev/null || true
+
 # Switch back to the original user
 USER 1000
 
@@ -33,3 +36,4 @@ USER 1000
 EXPOSE 8080
 
 # The base image handles the start command
+# WEBUI_SECRET_KEY should be set as environment variable, not file

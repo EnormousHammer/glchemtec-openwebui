@@ -37,7 +37,7 @@ services:
           property: host
           suffix: /oauth/microsoft/callback
       - key: WEBUI_SECRET_KEY
-        generateValue: true
+        sync: false
       - key: OPENID_PROVIDER_URL
         sync: false
       - key: ENABLE_OAUTH_PERSISTENT_CONFIG
