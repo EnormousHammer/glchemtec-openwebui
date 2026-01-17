@@ -62,27 +62,34 @@ Click on **"Environment"** tab and add these variables:
    - Value: `your_microsoft_client_id_here` (get from credentials.txt)
    - Mark as **Secret** ✓
 
-3. **MICROSOFT_TENANT_ID**
+3. **MICROSOFT_CLIENT_SECRET** ⚠️ **REQUIRED FOR AUTH**
+   - Key: `MICROSOFT_CLIENT_SECRET`
+   - Value: Get from Azure Portal → App registrations → Your app → Certificates & secrets
+   - Mark as **Secret** ✓
+   - **You must add this manually - it's not in credentials.txt**
+
+4. **MICROSOFT_TENANT_ID**
    - Key: `MICROSOFT_TENANT_ID`
    - Value: `your_microsoft_tenant_id_here` (get from credentials.txt)
    - Mark as **Secret** ✓
 
-### Optional Variables (Recommended):
+### Auto-Configured Variables (Set by render.yaml):
+- `WEBUI_AUTH=true` - Forces login immediately
+- `ENABLE_OAUTH_SIGNUP=true` - Allows Microsoft signups
+- `ENABLE_LOGIN_FORM=true` - Keeps username/password option
+- `WEBUI_URL` - Auto-set from your Render URL
+- `MICROSOFT_REDIRECT_URI` - Auto-set to your callback URL
+- `OPENID_PROVIDER_URL` - Microsoft OpenID endpoint
 
-4. **WEBUI_NAME**
+### Optional Variables:
+
+5. **WEBUI_NAME**
    - Key: `WEBUI_NAME`
    - Value: `GLChemTec OpenWebUI`
-   - Not secret
+   - Not secret (already in render.yaml)
 
-5. **ENABLE_SIGNUP**
-   - Key: `ENABLE_SIGNUP`
-   - Value: `false`
-   - Not secret (set to "true" if you want public signups)
-
-6. **DEFAULT_USER_ROLE**
-   - Key: `DEFAULT_USER_ROLE`
-   - Value: `admin`
-   - Not secret
+**Note:** If you want Microsoft-only login (no username/password), you can manually add:
+- `ENABLE_LOGIN_FORM=false` in Render dashboard
 
 ---
 

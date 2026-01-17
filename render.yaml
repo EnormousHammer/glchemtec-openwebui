@@ -13,11 +13,28 @@ services:
         sync: false
       - key: MICROSOFT_CLIENT_ID
         sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
       - key: MICROSOFT_TENANT_ID
         sync: false
       - key: WEBUI_NAME
         value: GLChemTec OpenWebUI
-      - key: ENABLE_SIGNUP
-        value: "false"
-      - key: DEFAULT_USER_ROLE
-        value: "admin"
+      - key: WEBUI_AUTH
+        value: "true"
+      - key: ENABLE_OAUTH_SIGNUP
+        value: "true"
+      - key: ENABLE_LOGIN_FORM
+        value: "true"
+      - key: WEBUI_URL
+        fromService:
+          type: web
+          name: glchemtec-openwebui
+          property: host
+      - key: MICROSOFT_REDIRECT_URI
+        fromService:
+          type: web
+          name: glchemtec-openwebui
+          property: host
+          suffix: /oauth/microsoft/callback
+      - key: OPENID_PROVIDER_URL
+        value: https://login.microsoftonline.com/fb807ad4-223e-4e42-97f7-b0029deb0e69/v2.0/.well-known/openid-configuration
