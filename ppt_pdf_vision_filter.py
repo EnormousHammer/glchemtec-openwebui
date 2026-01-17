@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 3.0
-description: Converts PPT/PPTX to PDF using LibreOffice, then embeds PDF as base64 marker for the Responses API proxy to pick up.
+version: 4.0
+description: Converts PPT/PPTX to PDF, then PDF pages to PNG images for vision analysis. Limits pages to control token usage.
 """
 
 import os
@@ -21,7 +21,8 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
-        max_pdf_size_mb: int = Field(default=20, description="Max PDF size in MB to embed")
+        max_pages: int = Field(default=10, description="Max pages to convert to images")
+        dpi: int = Field(default=150, description="DPI for PDF to image conversion")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -30,40 +31,26 @@ class Filter:
         if self.valves.debug:
             print(f"[PPT/PDF-FILTER] {msg}")
 
-    def _has_cmd(self, name: str) -> bool:
-        return shutil.which(name) is not None
-
     def _extract_all_files(self, body: dict, messages: list) -> List[Dict[str, Any]]:
         """Extract files from ALL possible locations in OpenWebUI."""
         all_files = []
         
-        # body["files"]
         if isinstance(body.get("files"), list):
             self._log(f"Found {len(body['files'])} file(s) in body['files']")
             all_files.extend(body["files"])
         
         for idx, msg in enumerate(messages):
-            # message["files"]
             if isinstance(msg.get("files"), list):
-                self._log(f"Found {len(msg['files'])} file(s) in messages[{idx}]['files']")
                 all_files.extend(msg["files"])
-            
-            # message["attachments"]
             if isinstance(msg.get("attachments"), list):
-                self._log(f"Found {len(msg['attachments'])} file(s) in messages[{idx}]['attachments']")
                 all_files.extend(msg["attachments"])
-            
-            # message["sources"] - This is where OpenWebUI stores file attachments
             if isinstance(msg.get("sources"), list):
-                for src_idx, source_obj in enumerate(msg["sources"]):
+                for source_obj in msg["sources"]:
                     if isinstance(source_obj, dict):
                         source = source_obj.get("source", {})
                         if source.get("type") == "file" and isinstance(source.get("file"), dict):
-                            file_info = source["file"]
-                            self._log(f"Found file in messages[{idx}]['sources'][{src_idx}]")
-                            all_files.append({"file": file_info, "_from_sources": True})
+                            all_files.append({"file": source["file"]})
         
-        # Deduplicate by path
         seen_paths = set()
         unique_files = []
         for f in all_files:
@@ -87,10 +74,7 @@ class Filter:
                 path = f["meta"].get("path", "")
                 if path:
                     return path.strip()
-        path = file_obj.get("path", "")
-        if path:
-            return path.strip()
-        return ""
+        return file_obj.get("path", "").strip()
 
     def _get_file_name(self, file_obj: Dict[str, Any]) -> str:
         if not isinstance(file_obj, dict):
@@ -99,11 +83,10 @@ class Filter:
             f = file_obj["file"]
             name = f.get("filename") or f.get("name") or ""
             if not name and isinstance(f.get("meta"), dict):
-                name = f["meta"].get("name") or f["meta"].get("filename") or ""
+                name = f["meta"].get("name") or ""
             if name:
                 return name.lower().strip()
-        name = file_obj.get("name") or file_obj.get("filename") or ""
-        return name.lower().strip()
+        return (file_obj.get("name") or file_obj.get("filename") or "").lower().strip()
 
     def _extract_text_content(self, content: Any) -> str:
         if isinstance(content, str):
@@ -128,19 +111,28 @@ class Filter:
                 self._log("LibreOffice not found!")
                 return None
 
+            profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
+            
             env = os.environ.copy()
             env["HOME"] = "/tmp"
+            env["TMPDIR"] = "/tmp"
 
             cmd = [
                 lo, "--headless", "--nologo", "--nofirststartwizard",
+                f"-env:UserInstallation=file://{profile_dir}",
                 "--convert-to", "pdf",
                 "--outdir", output_dir,
                 ppt_path,
             ]
             
-            self._log(f"Running LibreOffice conversion...")
-            subprocess.run(cmd, check=True, timeout=self.valves.libreoffice_timeout_sec, 
-                          capture_output=True, env=env)
+            self._log("Running LibreOffice conversion...")
+            result = subprocess.run(cmd, timeout=self.valves.libreoffice_timeout_sec, 
+                          capture_output=True, text=True, env=env)
+            
+            shutil.rmtree(profile_dir, ignore_errors=True)
+
+            if result.returncode != 0:
+                self._log(f"LibreOffice error: {result.stderr}")
 
             base = os.path.splitext(os.path.basename(ppt_path))[0]
             expected = os.path.join(output_dir, base + ".pdf")
@@ -151,30 +143,52 @@ class Filter:
 
             for fn in os.listdir(output_dir):
                 if fn.lower().endswith(".pdf"):
-                    candidate = os.path.join(output_dir, fn)
-                    self._log(f"Found PDF: {candidate}")
-                    return candidate
+                    return os.path.join(output_dir, fn)
 
             self._log("No PDF found after conversion")
             return None
 
-        except subprocess.TimeoutExpired:
-            self._log("LibreOffice timeout!")
-            return None
         except Exception as e:
             self._log(f"PPT->PDF error: {e}")
             return None
 
-    def file_to_base64(self, path: str) -> Optional[str]:
+    def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
+        """Convert PDF pages to PNG images using pdf2image."""
         try:
-            size_mb = os.path.getsize(path) / (1024 * 1024)
-            if size_mb > self.valves.max_pdf_size_mb:
-                self._log(f"PDF too large: {size_mb:.1f}MB > {self.valves.max_pdf_size_mb}MB limit")
-                return None
+            from pdf2image import convert_from_path
+            
+            self._log(f"Converting PDF to images (dpi={self.valves.dpi}, max_pages={self.valves.max_pages})...")
+            
+            images = convert_from_path(
+                pdf_path,
+                dpi=self.valves.dpi,
+                fmt="png",
+                first_page=1,
+                last_page=self.valves.max_pages,
+            )
+            
+            image_paths = []
+            for idx, img in enumerate(images):
+                img_path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
+                img.save(img_path, "PNG")
+                image_paths.append(img_path)
+            
+            self._log(f"Created {len(image_paths)} image(s)")
+            return image_paths
+
+        except ImportError:
+            self._log("pdf2image not installed!")
+            return []
+        except Exception as e:
+            self._log(f"PDF->images error: {e}")
+            return []
+
+    def image_to_base64(self, path: str) -> Optional[str]:
+        try:
             with open(path, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
         except Exception as e:
-            self._log(f"Base64 encode error: {e}")
+            self._log(f"Base64 error: {e}")
             return None
 
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
@@ -182,12 +196,10 @@ class Filter:
         self._log("INLET START")
 
         if not self.valves.enabled:
-            self._log("Filter disabled")
             return body
 
         messages = body.get("messages", [])
         if not messages:
-            self._log("No messages")
             return body
 
         files = self._extract_all_files(body, messages)
@@ -195,7 +207,7 @@ class Filter:
             self._log("No files found")
             return body
 
-        pdf_payloads = []
+        processed_images = []
 
         for file_obj in files:
             file_path = self._get_file_path(file_obj)
@@ -211,60 +223,51 @@ class Filter:
             is_pdf = file_name.endswith(".pdf")
 
             if not (is_ppt or is_pdf):
-                self._log(f"Skipping non-PPT/PDF: {file_name}")
+                self._log(f"Skipping: {file_name}")
                 continue
 
-            pdf_path = file_path
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                pdf_path = file_path
 
-            if is_ppt:
-                with tempfile.TemporaryDirectory() as tmp_dir:
+                if is_ppt:
                     self._log("Converting PPT -> PDF...")
                     pdf_path = self.convert_ppt_to_pdf(file_path, tmp_dir)
                     if not pdf_path:
-                        self._log("PPT->PDF failed")
                         continue
-                    
-                    pdf_b64 = self.file_to_base64(pdf_path)
-                    if pdf_b64:
-                        pdf_payloads.append({
-                            "filename": os.path.basename(pdf_path),
-                            "base64": pdf_b64
-                        })
-            else:
-                # Already PDF
-                pdf_b64 = self.file_to_base64(pdf_path)
-                if pdf_b64:
-                    pdf_payloads.append({
-                        "filename": os.path.basename(pdf_path),
-                        "base64": pdf_b64
-                    })
 
-        if not pdf_payloads:
-            self._log("No PDFs to embed")
+                self._log("Converting PDF -> Images...")
+                image_paths = self.convert_pdf_to_images(pdf_path, tmp_dir)
+                
+                for img_path in image_paths:
+                    b64 = self.image_to_base64(img_path)
+                    if b64:
+                        processed_images.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{b64}",
+                                "detail": "high",
+                            },
+                        })
+
+        if not processed_images:
+            self._log("No images to inject")
             return body
 
-        self._log(f"Embedding {len(pdf_payloads)} PDF(s)")
+        self._log(f"Injecting {len(processed_images)} image(s)")
 
-        # Get original user text
         last_message = messages[-1]
         original_text = self._extract_text_content(last_message.get("content", ""))
 
-        # Build content with PDF markers for the proxy to pick up
-        # Format: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
-        pdf_markers = []
-        for pdf in pdf_payloads:
-            marker = f"[__PDF_FILE_B64__ filename={pdf['filename']}]{pdf['base64']}[/__PDF_FILE_B64__]"
-            pdf_markers.append(marker)
+        instruction = (
+            f"{original_text}\n\n"
+            f"[{len(processed_images)} page images attached. Analyze ALL visible content: "
+            f"text, tables, charts, chemical structures, spectra (HPLC, NMR, MS), axes, and labels.]"
+        )
 
-        # Combine original text with PDF markers
-        combined_text = original_text
-        if pdf_markers:
-            combined_text = original_text + "\n\n" + "\n".join(pdf_markers)
-
-        messages[-1]["content"] = combined_text
+        messages[-1]["content"] = [{"type": "text", "text": instruction}] + processed_images
         body["messages"] = messages
 
-        self._log(f"Injected {len(pdf_payloads)} PDF marker(s)")
+        self._log(f"Done - injected {len(processed_images)} images")
         self._log("=" * 50)
 
         return body
