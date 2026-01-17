@@ -40,6 +40,8 @@ services:
         sync: false
       - key: OPENID_PROVIDER_URL
         sync: false
+      - key: CORS_ALLOW_ORIGIN
+        value: ""
       - key: ENABLE_OAUTH_PERSISTENT_CONFIG
         value: "true"
       - key: MICROSOFT_OAUTH_SCOPE

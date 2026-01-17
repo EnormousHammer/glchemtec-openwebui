@@ -26,8 +26,10 @@ RUN pip3 install --no-cache-dir \
     beautifulsoup4 \
     lxml
 
-# Fix permissions for secret key file if it exists
-RUN chmod 666 /app/.webui_secret_key 2>/dev/null || true
+# Fix permissions for static files and directories
+RUN chown -R 1000:1000 /app/backend/open_webui/static 2>/dev/null || true && \
+    chmod -R 755 /app/backend/open_webui/static 2>/dev/null || true && \
+    chmod 666 /app/.webui_secret_key 2>/dev/null || true
 
 # Switch back to the original user
 USER 1000
