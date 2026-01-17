@@ -21,7 +21,7 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
-        max_pages: int = Field(default=10, description="Max pages to convert to images")
+        max_pages: int = Field(default=30, description="Max pages to convert to images")
         dpi: int = Field(default=150, description="DPI for PDF to image conversion")
 
     def __init__(self):
