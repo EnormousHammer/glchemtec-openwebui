@@ -1,4 +1,4 @@
-﻿services:
+services:
   - type: web
     name: glchemtec-openwebui
     env: docker
@@ -19,16 +19,12 @@
         sync: false
       - key: WEBUI_NAME
         value: GLChemTec OpenWebUI
+      - key: WEBUI_AUTH
+        value: "true"
       - key: ENABLE_OAUTH_SIGNUP
         value: "true"
       - key: ENABLE_LOGIN_FORM
         value: "true"
-      - key: ENABLE_PASSWORD_AUTH
-        value: "true"
-      - key: ENABLE_SIGNUP
-        value: "true"
-      - key: ENABLE_PERSISTENT_CONFIG
-        value: "false"
       - key: WEBUI_URL
         fromService:
           type: web
@@ -51,8 +47,24 @@
       - key: MICROSOFT_OAUTH_SCOPE
         value: "openid email profile"
       - key: WEBUI_ADMIN_EMAIL
-        value: "haron@glchemtec.ca"
+        value: "haron@glchemtec.com"
       - key: WEBUI_ADMIN_PASSWORD
         sync: false
+      - key: ENABLE_SIGNUP
+        value: "false"
+      # Document/File Processing Settings
+      - key: RAG_EMBEDDING_MODEL
+        value: "text-embedding-3-small"
+      - key: ENABLE_RAG_WEB_SEARCH
+        value: "false"
+      - key: PDF_EXTRACT_IMAGES
+        value: "true"
+      - key: RAG_FILE_MAX_SIZE
+        value: "100"
+      - key: RAG_FILE_MAX_COUNT
+        value: "10"
+      - key: USER_PERMISSIONS_CHAT_FILE_UPLOAD
+        value: "true"
+      # Default user role (not admin for new users)
       - key: DEFAULT_USER_ROLE
-        value: "admin"
+        value: "user"
