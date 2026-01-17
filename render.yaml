@@ -11,6 +11,9 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
+      # Route OpenAI calls through internal proxy for PDF vision support
+      - key: OPENAI_API_BASE_URLS
+        value: "http://localhost:8000/v1"
       - key: MICROSOFT_CLIENT_ID
         sync: false
       - key: MICROSOFT_CLIENT_SECRET
