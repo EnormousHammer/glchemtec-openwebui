@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: glchemtec-openwebui
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: standard
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_TENANT_ID
+        sync: false
+      - key: WEBUI_NAME
+        value: GLChemTec OpenWebUI
+      - key: ENABLE_SIGNUP
+        value: "false"
+      - key: DEFAULT_USER_ROLE
+        value: "admin"
