@@ -260,8 +260,10 @@ class Filter:
 
         instruction = (
             f"{original_text}\n\n"
-            f"[{len(processed_images)} page images attached. Analyze ALL visible content: "
-            f"text, tables, charts, chemical structures, spectra (HPLC, NMR, MS), axes, and labels.]"
+            f"[{len(processed_images)} page images from the document are attached. "
+            f"Provide a comprehensive summary analyzing ALL content together - "
+            f"text, tables, charts, chemical structures, spectra (HPLC, NMR, MS), reaction schemes, and data. "
+            f"Do NOT describe slide-by-slide. Give a unified technical analysis.]"
         )
 
         messages[-1]["content"] = [{"type": "text", "text": instruction}] + processed_images
