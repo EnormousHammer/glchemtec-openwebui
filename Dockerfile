@@ -78,7 +78,15 @@ RUN pip3 install --no-cache-dir \
     matplotlib \
     plotly \
     kaleido \
-    seaborn
+    seaborn \
+    # Proxy dependencies
+    fastapi \
+    uvicorn \
+    httpx
+
+# Copy proxy script and startup script
+COPY openai_responses_proxy.py /app/openai_responses_proxy.py
+COPY start.sh /app/start.sh
 
 # Create directories with proper permissions for NLTK and other data
 RUN mkdir -p /home/user/nltk_data && \
@@ -88,7 +96,9 @@ RUN mkdir -p /home/user/nltk_data && \
     chmod -R 777 /home/user/nltk_data && \
     chmod -R 777 /app/data && \
     chmod -R 777 /app/uploads && \
-    chmod -R 777 /tmp/libreoffice
+    chmod -R 777 /tmp/libreoffice && \
+    chmod +x /app/openai_responses_proxy.py && \
+    chmod +x /app/start.sh
 
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt', download_dir='/home/user/nltk_data'); nltk.download('averaged_perceptron_tagger', download_dir='/home/user/nltk_data'); nltk.download('stopwords', download_dir='/home/user/nltk_data')" || true
@@ -108,8 +118,8 @@ RUN chown -R 1000:1000 /app/backend/open_webui/static 2>/dev/null || true && \
 # Switch back to the original user
 USER 1000
 
-# Expose port (Render will set PORT env var)
-EXPOSE 8080
+# Expose ports (8080 for OpenWebUI, 8000 for proxy)
+EXPOSE 8080 8000
 
-# The base image handles the start command
-# WEBUI_SECRET_KEY should be set as environment variable, not file
+# Start both services
+CMD ["/bin/bash", "/app/start.sh"]

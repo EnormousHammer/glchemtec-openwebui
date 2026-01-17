@@ -67,3 +67,6 @@ services:
         value: "true"
       - key: DEFAULT_USER_ROLE
         value: "user"
+      # Proxy settings
+      - key: PROXY_DEBUG
+        value: "true"
