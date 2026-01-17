@@ -1,4 +1,4 @@
-services:
+﻿services:
   - type: web
     name: glchemtec-openwebui
     env: docker
@@ -19,11 +19,15 @@ services:
         sync: false
       - key: WEBUI_NAME
         value: GLChemTec OpenWebUI
-      - key: WEBUI_AUTH
-        value: "false"
       - key: ENABLE_OAUTH_SIGNUP
-        value: "false"
+        value: "true"
       - key: ENABLE_LOGIN_FORM
+        value: "true"
+      - key: ENABLE_PASSWORD_AUTH
+        value: "true"
+      - key: ENABLE_SIGNUP
+        value: "true"
+      - key: ENABLE_PERSISTENT_CONFIG
         value: "false"
       - key: WEBUI_URL
         fromService:
@@ -43,6 +47,12 @@ services:
       - key: CORS_ALLOW_ORIGIN
         value: ""
       - key: ENABLE_OAUTH_PERSISTENT_CONFIG
-        value: "false"
+        value: "true"
       - key: MICROSOFT_OAUTH_SCOPE
         value: "openid email profile"
+      - key: WEBUI_ADMIN_EMAIL
+        value: "haron@glchemtec.ca"
+      - key: WEBUI_ADMIN_PASSWORD
+        sync: false
+      - key: DEFAULT_USER_ROLE
+        value: "admin"
