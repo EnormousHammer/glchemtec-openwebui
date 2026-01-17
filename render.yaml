@@ -36,5 +36,11 @@ services:
           name: glchemtec-openwebui
           property: host
           suffix: /oauth/microsoft/callback
+      - key: WEBUI_SECRET_KEY
+        generateValue: true
       - key: OPENID_PROVIDER_URL
-        value: https://login.microsoftonline.com/fb807ad4-223e-4e42-97f7-b0029deb0e69/v2.0/.well-known/openid-configuration
+        value: https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/v2.0/.well-known/openid-configuration
+      - key: ENABLE_OAUTH_PERSISTENT_CONFIG
+        value: "true"
+      - key: MICROSOFT_OAUTH_SCOPE
+        value: "openid email profile"
