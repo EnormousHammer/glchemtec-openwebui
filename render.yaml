@@ -39,7 +39,7 @@ services:
       - key: WEBUI_SECRET_KEY
         generateValue: true
       - key: OPENID_PROVIDER_URL
-        value: https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/v2.0/.well-known/openid-configuration
+        sync: false
       - key: ENABLE_OAUTH_PERSISTENT_CONFIG
         value: "true"
       - key: MICROSOFT_OAUTH_SCOPE
