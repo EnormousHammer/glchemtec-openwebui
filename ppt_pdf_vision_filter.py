@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter (Claude-Style)
 author: GLChemTec
-version: 7.0
-description: Mimics Claude's PDF processing - converts each page to image + extracts text, sends both to model.
+version: 7.1
+description: Claude-style PDF processing with token optimization - JPEG compression, resizing, optional text extraction.
 """
 
 import os
@@ -21,8 +21,13 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
-        max_pages: int = Field(default=100, description="Max pages to process (Claude uses ~100)")
-        dpi: int = Field(default=150, description="DPI for page images")
+        # Token management
+        max_pages: int = Field(default=30, description="Max pages to process")
+        dpi: int = Field(default=100, description="DPI for page images (lower = smaller tokens)")
+        max_image_width: int = Field(default=1200, description="Max image width in pixels")
+        jpeg_quality: int = Field(default=70, description="JPEG quality (1-100, lower = smaller)")
+        use_jpeg: bool = Field(default=True, description="Use JPEG instead of PNG (much smaller)")
+        skip_text_extraction: bool = Field(default=False, description="Skip text to save tokens")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -148,17 +153,37 @@ class Filter:
         return "\n\n".join(text_parts)
 
     def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
-        """Convert PDF pages to images."""
+        """Convert PDF pages to optimized images for token efficiency."""
         try:
             from pdf2image import convert_from_path
+            from PIL import Image
+            
             images = convert_from_path(pdf_path, dpi=self.valves.dpi, fmt="png",
                                        first_page=1, last_page=self.valves.max_pages)
             paths = []
+            total_size = 0
+            
             for idx, img in enumerate(images):
-                path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
-                img.save(path, "PNG", optimize=True)
+                # Resize if too wide (saves tokens significantly)
+                if img.width > self.valves.max_image_width:
+                    ratio = self.valves.max_image_width / img.width
+                    new_height = int(img.height * ratio)
+                    img = img.resize((self.valves.max_image_width, new_height), Image.LANCZOS)
+                
+                # Save as JPEG (much smaller) or PNG
+                if self.valves.use_jpeg:
+                    path = os.path.join(output_dir, f"page_{idx+1:03d}.jpg")
+                    img = img.convert("RGB")  # JPEG doesn't support alpha
+                    img.save(path, "JPEG", quality=self.valves.jpeg_quality, optimize=True)
+                else:
+                    path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
+                    img.save(path, "PNG", optimize=True)
+                
+                file_size = os.path.getsize(path)
+                total_size += file_size
                 paths.append(path)
-            self._log(f"Created {len(paths)} page images")
+            
+            self._log(f"Created {len(paths)} images, total size: {total_size / 1024 / 1024:.1f} MB")
             return paths
         except Exception as e:
             self._log(f"PDF->images error: {e}")
@@ -214,11 +239,12 @@ class Filter:
                     if not pdf_path:
                         continue
 
-                # Stage 2a: Extract text from PDF
-                self._log("Stage 2a: Extracting text from PDF")
-                extracted_text = self.extract_text_from_pdf(pdf_path)
-                if extracted_text:
-                    all_text.append(f"=== Document: {file_name} ===\n{extracted_text}")
+                # Stage 2a: Extract text from PDF (optional - can skip to save tokens)
+                if not self.valves.skip_text_extraction:
+                    self._log("Stage 2a: Extracting text from PDF")
+                    extracted_text = self.extract_text_from_pdf(pdf_path)
+                    if extracted_text:
+                        all_text.append(f"=== Document: {file_name} ===\n{extracted_text}")
 
                 # Stage 2b: Convert pages to images
                 self._log("Stage 2b: Converting pages to images")
@@ -227,9 +253,11 @@ class Filter:
                 for img_path in image_paths:
                     b64 = self.image_to_base64(img_path)
                     if b64:
+                        # Use correct mime type
+                        mime = "image/jpeg" if self.valves.use_jpeg else "image/png"
                         all_images.append({
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}
+                            "image_url": {"url": f"data:{mime};base64,{b64}", "detail": "low"}
                         })
 
         if not all_images and not all_text:
