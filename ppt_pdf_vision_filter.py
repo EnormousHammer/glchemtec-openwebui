@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 5.0
-description: Converts PPT/PPTX to PDF, then sends PDF directly to OpenAI Responses API for native vision analysis (no quality loss).
+version: 6.0
+description: Converts PPT/PPTX to PDF, then PDF pages to high-quality PNG images for vision analysis. Optimized for chemistry documents (NMR, HPLC, spectra).
 """
 
 import os
@@ -21,6 +21,8 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
+        max_pages: int = Field(default=25, description="Max pages to convert to images")
+        dpi: int = Field(default=200, description="DPI for PDF to image conversion (higher = better quality but more tokens)")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -150,8 +152,38 @@ class Filter:
             self._log(f"PPT->PDF error: {e}")
             return None
 
-    def file_to_base64(self, path: str) -> Optional[str]:
-        """Read file and encode as base64."""
+    def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
+        """Convert PDF pages to PNG images using pdf2image."""
+        try:
+            from pdf2image import convert_from_path
+            
+            self._log(f"Converting PDF to images (dpi={self.valves.dpi}, max_pages={self.valves.max_pages})...")
+            
+            images = convert_from_path(
+                pdf_path,
+                dpi=self.valves.dpi,
+                fmt="png",
+                first_page=1,
+                last_page=self.valves.max_pages,
+            )
+            
+            image_paths = []
+            for idx, img in enumerate(images):
+                img_path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
+                img.save(img_path, "PNG", optimize=True)
+                image_paths.append(img_path)
+            
+            self._log(f"Created {len(image_paths)} image(s)")
+            return image_paths
+
+        except ImportError:
+            self._log("pdf2image not installed!")
+            return []
+        except Exception as e:
+            self._log(f"PDF->images error: {e}")
+            return []
+
+    def image_to_base64(self, path: str) -> Optional[str]:
         try:
             with open(path, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
@@ -161,7 +193,7 @@ class Filter:
 
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         self._log("=" * 50)
-        self._log("INLET START (v5.0 - Direct PDF)")
+        self._log("INLET START (v6.0 - High-Quality Images)")
 
         if not self.valves.enabled:
             return body
@@ -175,7 +207,7 @@ class Filter:
             self._log("No files found")
             return body
 
-        pdf_markers = []
+        processed_images = []
 
         for file_obj in files:
             file_path = self._get_file_path(file_obj)
@@ -194,64 +226,51 @@ class Filter:
                 self._log(f"Skipping: {file_name}")
                 continue
 
-            pdf_path = file_path
-            tmp_dir = None
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                pdf_path = file_path
 
-            try:
                 if is_ppt:
                     self._log("Converting PPT -> PDF...")
-                    tmp_dir = tempfile.mkdtemp(prefix="ppt_convert_")
                     pdf_path = self.convert_ppt_to_pdf(file_path, tmp_dir)
                     if not pdf_path:
                         continue
 
-                # Read PDF and encode as base64
-                self._log(f"Encoding PDF: {pdf_path}")
-                pdf_b64 = self.file_to_base64(pdf_path)
+                self._log("Converting PDF -> Images...")
+                image_paths = self.convert_pdf_to_images(pdf_path, tmp_dir)
                 
-                if pdf_b64:
-                    # Get a clean filename for the PDF
-                    pdf_filename = os.path.basename(pdf_path)
-                    if is_ppt:
-                        # Use original PPT name but with .pdf extension
-                        base_name = os.path.splitext(os.path.basename(file_path))[0]
-                        pdf_filename = f"{base_name}.pdf"
-                    
-                    # Create marker that proxy will recognize
-                    marker = f"[__PDF_FILE_B64__ filename={pdf_filename}]{pdf_b64}[/__PDF_FILE_B64__]"
-                    pdf_markers.append(marker)
-                    self._log(f"Created PDF marker for: {pdf_filename} ({len(pdf_b64)} chars)")
+                for img_path in image_paths:
+                    b64 = self.image_to_base64(img_path)
+                    if b64:
+                        processed_images.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{b64}",
+                                "detail": "high",
+                            },
+                        })
 
-            finally:
-                if tmp_dir and os.path.exists(tmp_dir):
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-
-        if not pdf_markers:
-            self._log("No PDFs to inject")
+        if not processed_images:
+            self._log("No images to inject")
             return body
 
-        self._log(f"Injecting {len(pdf_markers)} PDF(s)")
+        self._log(f"Injecting {len(processed_images)} image(s)")
 
         last_message = messages[-1]
         original_text = self._extract_text_content(last_message.get("content", ""))
 
-        # Build instruction with PDF markers
         instruction = (
             f"{original_text}\n\n"
-            f"[{len(pdf_markers)} PDF document(s) attached for analysis. "
-            f"Provide a comprehensive summary analyzing ALL content together - "
-            f"text, tables, charts, chemical structures, spectra (HPLC, NMR, MS), reaction schemes, and data. "
-            f"For spectra, read peak values and labels if legible. "
-            f"Do NOT describe page-by-page. Give a unified technical analysis.]\n\n"
+            f"[{len(processed_images)} page images from the document are attached at {self.valves.dpi} DPI. "
+            f"Provide a comprehensive technical analysis of ALL content together - "
+            f"text, tables, charts, chemical structures, reaction schemes, and analytical data. "
+            f"For spectra (NMR, HPLC, MS, IR), read peak values, chemical shifts, retention times, and labels if legible. "
+            f"Do NOT describe page-by-page. Give a unified scientific summary.]"
         )
-        
-        # Append all PDF markers
-        instruction += "\n".join(pdf_markers)
 
-        messages[-1]["content"] = instruction
+        messages[-1]["content"] = [{"type": "text", "text": instruction}] + processed_images
         body["messages"] = messages
 
-        self._log(f"Done - injected {len(pdf_markers)} PDF marker(s)")
+        self._log(f"Done - injected {len(processed_images)} images at {self.valves.dpi} DPI")
         self._log("=" * 50)
 
         return body
