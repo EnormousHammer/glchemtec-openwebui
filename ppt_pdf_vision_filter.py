@@ -1,7 +1,7 @@
 """
 title: PPT/PDF Vision Filter (Claude-Style)
 author: GLChemTec
-version: 7.1
+version: 7.2
 description: Claude-style PDF processing with token optimization - JPEG compression, resizing, optional text extraction.
 """
 
@@ -21,13 +21,13 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
-        # Token management
-        max_pages: int = Field(default=30, description="Max pages to process")
-        dpi: int = Field(default=100, description="DPI for page images (lower = smaller tokens)")
-        max_image_width: int = Field(default=1200, description="Max image width in pixels")
-        jpeg_quality: int = Field(default=70, description="JPEG quality (1-100, lower = smaller)")
+        # Token management - AGGRESSIVE defaults to stay under 272K limit
+        max_pages: int = Field(default=25, description="Max pages to process")
+        dpi: int = Field(default=72, description="DPI for page images (72 = screen quality)")
+        max_image_width: int = Field(default=800, description="Max image width in pixels")
+        jpeg_quality: int = Field(default=50, description="JPEG quality (50 = good enough for text/charts)")
         use_jpeg: bool = Field(default=True, description="Use JPEG instead of PNG (much smaller)")
-        skip_text_extraction: bool = Field(default=False, description="Skip text to save tokens")
+        skip_text_extraction: bool = Field(default=True, description="Skip text - images have it all")
 
     def __init__(self):
         self.valves = self.Valves()
