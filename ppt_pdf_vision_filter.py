@@ -1,8 +1,8 @@
 """
-title: PPT/PDF Vision Filter
+title: PPT/PDF Vision Filter (Claude-Style)
 author: GLChemTec
-version: 6.0
-description: Converts PPT/PPTX to PDF, then PDF pages to high-quality PNG images for vision analysis. Optimized for chemistry documents (NMR, HPLC, spectra).
+version: 7.0
+description: Mimics Claude's PDF processing - converts each page to image + extracts text, sends both to model.
 """
 
 import os
@@ -21,25 +21,21 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         debug: bool = Field(default=True, description="Enable debug logging")
-        max_pages: int = Field(default=25, description="Max pages to convert to images")
-        dpi: int = Field(default=200, description="DPI for PDF to image conversion (higher = better quality but more tokens)")
+        max_pages: int = Field(default=100, description="Max pages to process (Claude uses ~100)")
+        dpi: int = Field(default=150, description="DPI for page images")
 
     def __init__(self):
         self.valves = self.Valves()
 
     def _log(self, msg: str) -> None:
         if self.valves.debug:
-            print(f"[PPT/PDF-FILTER] {msg}")
+            print(f"[CLAUDE-STYLE] {msg}")
 
     def _extract_all_files(self, body: dict, messages: list) -> List[Dict[str, Any]]:
-        """Extract files from ALL possible locations in OpenWebUI."""
         all_files = []
-        
         if isinstance(body.get("files"), list):
-            self._log(f"Found {len(body['files'])} file(s) in body['files']")
             all_files.extend(body["files"])
-        
-        for idx, msg in enumerate(messages):
+        for msg in messages:
             if isinstance(msg.get("files"), list):
                 all_files.extend(msg["files"])
             if isinstance(msg.get("attachments"), list):
@@ -51,16 +47,14 @@ class Filter:
                         if source.get("type") == "file" and isinstance(source.get("file"), dict):
                             all_files.append({"file": source["file"]})
         
-        seen_paths = set()
-        unique_files = []
+        seen = set()
+        unique = []
         for f in all_files:
             path = self._get_file_path(f)
-            if path and path not in seen_paths:
-                seen_paths.add(path)
-                unique_files.append(f)
-        
-        self._log(f"Total unique files: {len(unique_files)}")
-        return unique_files
+            if path and path not in seen:
+                seen.add(path)
+                unique.append(f)
+        return unique
 
     def _get_file_path(self, file_obj: Dict[str, Any]) -> str:
         if not isinstance(file_obj, dict):
@@ -71,9 +65,7 @@ class Filter:
             if path:
                 return path.strip()
             if isinstance(f.get("meta"), dict):
-                path = f["meta"].get("path", "")
-                if path:
-                    return path.strip()
+                return f["meta"].get("path", "").strip()
         return file_obj.get("path", "").strip()
 
     def _get_file_name(self, file_obj: Dict[str, Any]) -> str:
@@ -84,101 +76,90 @@ class Filter:
             name = f.get("filename") or f.get("name") or ""
             if not name and isinstance(f.get("meta"), dict):
                 name = f["meta"].get("name") or ""
-            if name:
-                return name.lower().strip()
+            return name.lower().strip()
         return (file_obj.get("name") or file_obj.get("filename") or "").lower().strip()
 
     def _extract_text_content(self, content: Any) -> str:
         if isinstance(content, str):
             return content
         if isinstance(content, list):
-            parts = []
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    parts.append(item.get("text", ""))
-            return "\n".join([p for p in parts if p]).strip()
-        return str(content) if content is not None else ""
+            parts = [item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"]
+            return "\n".join(p for p in parts if p).strip()
+        return str(content) if content else ""
 
     def convert_ppt_to_pdf(self, ppt_path: str, output_dir: str) -> Optional[str]:
         """Convert PPT/PPTX to PDF via LibreOffice."""
         try:
-            if not os.path.exists(ppt_path):
-                self._log(f"PPT file not found: {ppt_path}")
-                return None
-
             lo = shutil.which("libreoffice") or shutil.which("soffice")
             if not lo:
-                self._log("LibreOffice not found!")
+                self._log("LibreOffice not found")
                 return None
 
-            profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
-            
+            profile_dir = tempfile.mkdtemp(prefix="lo_")
             env = os.environ.copy()
             env["HOME"] = "/tmp"
-            env["TMPDIR"] = "/tmp"
 
-            cmd = [
-                lo, "--headless", "--nologo", "--nofirststartwizard",
-                f"-env:UserInstallation=file://{profile_dir}",
-                "--convert-to", "pdf",
-                "--outdir", output_dir,
-                ppt_path,
-            ]
+            cmd = [lo, "--headless", "--nologo", "--nofirststartwizard",
+                   f"-env:UserInstallation=file://{profile_dir}",
+                   "--convert-to", "pdf", "--outdir", output_dir, ppt_path]
             
-            self._log("Running LibreOffice conversion...")
-            result = subprocess.run(cmd, timeout=self.valves.libreoffice_timeout_sec, 
-                          capture_output=True, text=True, env=env)
-            
+            subprocess.run(cmd, timeout=self.valves.libreoffice_timeout_sec, 
+                          capture_output=True, env=env)
             shutil.rmtree(profile_dir, ignore_errors=True)
 
-            if result.returncode != 0:
-                self._log(f"LibreOffice error: {result.stderr}")
-
             base = os.path.splitext(os.path.basename(ppt_path))[0]
-            expected = os.path.join(output_dir, base + ".pdf")
-
-            if os.path.exists(expected):
-                self._log(f"PDF created: {expected}")
-                return expected
-
-            for fn in os.listdir(output_dir):
-                if fn.lower().endswith(".pdf"):
-                    return os.path.join(output_dir, fn)
-
-            self._log("No PDF found after conversion")
-            return None
-
+            pdf_path = os.path.join(output_dir, base + ".pdf")
+            return pdf_path if os.path.exists(pdf_path) else None
         except Exception as e:
             self._log(f"PPT->PDF error: {e}")
             return None
 
+    def extract_text_from_pdf(self, pdf_path: str) -> str:
+        """Extract text from PDF using pdfplumber or PyMuPDF."""
+        text_parts = []
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(pdf_path)
+            for page_num, page in enumerate(doc):
+                if page_num >= self.valves.max_pages:
+                    break
+                text = page.get_text()
+                if text.strip():
+                    text_parts.append(f"--- Page {page_num + 1} ---\n{text.strip()}")
+            doc.close()
+            self._log(f"Extracted text from {min(len(text_parts), self.valves.max_pages)} pages")
+        except ImportError:
+            self._log("PyMuPDF not available, trying pdfplumber")
+            try:
+                import pdfplumber
+                with pdfplumber.open(pdf_path) as pdf:
+                    for page_num, page in enumerate(pdf.pages):
+                        if page_num >= self.valves.max_pages:
+                            break
+                        text = page.extract_text() or ""
+                        if text.strip():
+                            text_parts.append(f"--- Page {page_num + 1} ---\n{text.strip()}")
+                self._log(f"Extracted text from {len(text_parts)} pages")
+            except Exception as e:
+                self._log(f"Text extraction failed: {e}")
+        except Exception as e:
+            self._log(f"Text extraction error: {e}")
+        
+        return "\n\n".join(text_parts)
+
     def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
-        """Convert PDF pages to PNG images using pdf2image."""
+        """Convert PDF pages to images."""
         try:
             from pdf2image import convert_from_path
-            
-            self._log(f"Converting PDF to images (dpi={self.valves.dpi}, max_pages={self.valves.max_pages})...")
-            
-            images = convert_from_path(
-                pdf_path,
-                dpi=self.valves.dpi,
-                fmt="png",
-                first_page=1,
-                last_page=self.valves.max_pages,
-            )
-            
-            image_paths = []
+            images = convert_from_path(pdf_path, dpi=self.valves.dpi, fmt="png",
+                                       first_page=1, last_page=self.valves.max_pages)
+            paths = []
             for idx, img in enumerate(images):
-                img_path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
-                img.save(img_path, "PNG", optimize=True)
-                image_paths.append(img_path)
-            
-            self._log(f"Created {len(image_paths)} image(s)")
-            return image_paths
-
-        except ImportError:
-            self._log("pdf2image not installed!")
-            return []
+                path = os.path.join(output_dir, f"page_{idx+1:03d}.png")
+                img.save(path, "PNG", optimize=True)
+                paths.append(path)
+            self._log(f"Created {len(paths)} page images")
+            return paths
         except Exception as e:
             self._log(f"PDF->images error: {e}")
             return []
@@ -187,13 +168,12 @@ class Filter:
         try:
             with open(path, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
-        except Exception as e:
-            self._log(f"Base64 error: {e}")
+        except:
             return None
 
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         self._log("=" * 50)
-        self._log("INLET START (v6.0 - High-Quality Images)")
+        self._log("INLET - Claude-Style Processing (v7.0)")
 
         if not self.valves.enabled:
             return body
@@ -204,75 +184,86 @@ class Filter:
 
         files = self._extract_all_files(body, messages)
         if not files:
-            self._log("No files found")
             return body
 
-        processed_images = []
+        all_images = []
+        all_text = []
 
         for file_obj in files:
             file_path = self._get_file_path(file_obj)
             file_name = self._get_file_name(file_obj)
 
-            self._log(f"Processing: {file_name}")
-
             if not file_path or not os.path.exists(file_path):
-                self._log(f"File not found: {file_path}")
                 continue
 
             is_ppt = file_name.endswith((".ppt", ".pptx"))
             is_pdf = file_name.endswith(".pdf")
 
             if not (is_ppt or is_pdf):
-                self._log(f"Skipping: {file_name}")
                 continue
+
+            self._log(f"Processing: {file_name}")
 
             with tempfile.TemporaryDirectory() as tmp_dir:
                 pdf_path = file_path
 
+                # Stage 1: Convert PPT to PDF if needed
                 if is_ppt:
-                    self._log("Converting PPT -> PDF...")
+                    self._log("Stage 1: PPT -> PDF")
                     pdf_path = self.convert_ppt_to_pdf(file_path, tmp_dir)
                     if not pdf_path:
                         continue
 
-                self._log("Converting PDF -> Images...")
+                # Stage 2a: Extract text from PDF
+                self._log("Stage 2a: Extracting text from PDF")
+                extracted_text = self.extract_text_from_pdf(pdf_path)
+                if extracted_text:
+                    all_text.append(f"=== Document: {file_name} ===\n{extracted_text}")
+
+                # Stage 2b: Convert pages to images
+                self._log("Stage 2b: Converting pages to images")
                 image_paths = self.convert_pdf_to_images(pdf_path, tmp_dir)
                 
                 for img_path in image_paths:
                     b64 = self.image_to_base64(img_path)
                     if b64:
-                        processed_images.append({
+                        all_images.append({
                             "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{b64}",
-                                "detail": "high",
-                            },
+                            "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}
                         })
 
-        if not processed_images:
-            self._log("No images to inject")
+        if not all_images and not all_text:
+            self._log("No content extracted")
             return body
 
-        self._log(f"Injecting {len(processed_images)} image(s)")
+        # Stage 3: Combine text + images for the model
+        self._log(f"Stage 3: Combining {len(all_images)} images + extracted text")
 
         last_message = messages[-1]
-        original_text = self._extract_text_content(last_message.get("content", ""))
+        original_prompt = self._extract_text_content(last_message.get("content", ""))
 
-        instruction = (
-            f"{original_text}\n\n"
-            f"[{len(processed_images)} page images from the document are attached at {self.valves.dpi} DPI. "
-            f"Provide a comprehensive technical analysis of ALL content together - "
-            f"text, tables, charts, chemical structures, reaction schemes, and analytical data. "
-            f"For spectra (NMR, HPLC, MS, IR), read peak values, chemical shifts, retention times, and labels if legible. "
-            f"Do NOT describe page-by-page. Give a unified scientific summary.]"
+        # Build combined content like Claude does
+        combined_text = f"{original_prompt}\n\n"
+        
+        if all_text:
+            combined_text += "[EXTRACTED TEXT FROM DOCUMENT]\n"
+            combined_text += "\n".join(all_text)
+            combined_text += "\n\n"
+        
+        combined_text += (
+            f"[{len(all_images)} PAGE IMAGES ATTACHED]\n"
+            "Analyze both the extracted text AND the page images. "
+            "For spectra (NMR, HPLC, MS), read peaks, chemical shifts, and labels from the images. "
+            "Cross-reference with the extracted text for accuracy."
         )
 
-        messages[-1]["content"] = [{"type": "text", "text": instruction}] + processed_images
+        # Combine: text block + all image blocks
+        content_blocks = [{"type": "text", "text": combined_text}] + all_images
+        messages[-1]["content"] = content_blocks
         body["messages"] = messages
 
-        self._log(f"Done - injected {len(processed_images)} images at {self.valves.dpi} DPI")
+        self._log(f"Done - {len(all_images)} images + {len(all_text)} text sections")
         self._log("=" * 50)
-
         return body
 
     def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
