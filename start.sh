@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
+cd /app
+
 echo "Starting OpenAI Responses Proxy on port 8000..."
-uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 &
+python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 &
 
 # Wait for proxy to be ready (up to 30 seconds)
 for i in {1..30}; do
