@@ -73,3 +73,6 @@ services:
       # Proxy settings
       - key: PROXY_DEBUG
         value: "true"
+      # Claude/Anthropic API for document analysis
+      - key: ANTHROPIC_API_KEY
+        sync: false
