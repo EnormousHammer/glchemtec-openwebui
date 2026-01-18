@@ -77,12 +77,12 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
     """
     content_items = []
     
-    # Add PDF files first
+    # Add PDF files first (using data URL format)
     for pdf in pdfs:
         content_items.append({
             "type": "input_file",
             "filename": pdf["filename"],
-            "file_data": pdf["base64"],
+            "file_data": f"data:application/pdf;base64,{pdf['base64']}",
         })
         log(f"Adding PDF: {pdf['filename']}")
     
