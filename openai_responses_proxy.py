@@ -1004,11 +1004,8 @@ async def chat_completions(request: Request):
     
     log(f"Found {len(all_pdfs)} PDF(s), {len(all_images)} image(s), {len(all_text_blocks)} text block(s) (markers+uploads)")
 
-    # If NMR-looking images present, enrich user text with ACS-style instructions
-    nmr_image = any(
-        isinstance(img, dict) and isinstance(img.get("name"), str) and "nmr" in img["name"].lower()
-        for img in upload_images
-    )
+    # If any images are present, add conditional NMR instructions for the model
+    nmr_image = bool(upload_images or marker_images)
     augmented_text = all_text
     if nmr_image:
         nmr_prompt = (
@@ -1016,7 +1013,7 @@ async def chat_completions(request: Request):
             "- If any attached image is an NMR spectrum, extract a peak table: δ (ppm), multiplicity, integration, J (Hz) if visible, assignment if clear.\n"
             "- Then generate an ACS-style summary (Journal of Organic Chemistry style) with proper nuclei symbols and δ notation.\n"
             "- State nucleus (¹H or ¹³C) inferred from axis/labels; if unclear, note the uncertainty.\n"
-            "- If image is not NMR, say it is not an NMR spectrum.\n"
+            "- If image is not an NMR spectrum, say it is not an NMR spectrum.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
     
