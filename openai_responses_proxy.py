@@ -670,7 +670,7 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
         if _is_image(mime):
             with open(path, "rb") as fh:
                 b64 = base64.b64encode(fh.read()).decode("utf-8")
-            images.append({"url": f"data:{mime};base64,{b64}"})
+            images.append({"url": f"data:{mime};base64,{b64}", "name": name})
             total_bytes += size
             continue
 
@@ -1003,6 +1003,22 @@ async def chat_completions(request: Request):
     all_text_blocks = upload_texts
     
     log(f"Found {len(all_pdfs)} PDF(s), {len(all_images)} image(s), {len(all_text_blocks)} text block(s) (markers+uploads)")
+
+    # If NMR-looking images present, enrich user text with ACS-style instructions
+    nmr_image = any(
+        isinstance(img, dict) and isinstance(img.get("name"), str) and "nmr" in img["name"].lower()
+        for img in upload_images
+    )
+    augmented_text = all_text
+    if nmr_image:
+        nmr_prompt = (
+            "\n\n[INSTRUCTION FOR NMR IMAGES]\n"
+            "- If any attached image is an NMR spectrum, extract a peak table: δ (ppm), multiplicity, integration, J (Hz) if visible, assignment if clear.\n"
+            "- Then generate an ACS-style summary (Journal of Organic Chemistry style) with proper nuclei symbols and δ notation.\n"
+            "- State nucleus (¹H or ¹³C) inferred from axis/labels; if unclear, note the uncertainty.\n"
+            "- If image is not NMR, say it is not an NMR spectrum.\n"
+        )
+        augmented_text = (all_text + nmr_prompt).strip()
     
     # If we have PDFs/images/text blocks, use Responses API
     if all_pdfs or all_images or all_text_blocks:
@@ -1010,12 +1026,12 @@ async def chat_completions(request: Request):
         try:
             if stream:
                 async def proxied_stream():
-                    async for event in stream_responses_api(model, all_text, all_pdfs, all_images, all_text_blocks):
+                    async for event in stream_responses_api(model, augmented_text, all_pdfs, all_images, all_text_blocks):
                         yield event
 
                 return StreamingResponse(proxied_stream(), media_type="text/event-stream")
 
-            resp_data = await call_responses_api(model, all_text, all_pdfs, all_images, all_text_blocks)
+            resp_data = await call_responses_api(model, augmented_text, all_pdfs, all_images, all_text_blocks)
             result = responses_to_chat_completion(resp_data, model)
             return JSONResponse(content=result)
             
