@@ -32,6 +32,8 @@ MAX_CSV_ROWS = 1000
 MAX_CSV_COLS = 50
 MAX_XLSX_ROWS = 500
 MAX_XLSX_COLS = 50
+MAX_TEXT_CHARS = 40000
+MAX_JSON_BYTES = 1_000_000
 
 # Regex to find PDF markers: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
 PDF_MARKER_RE = re.compile(
@@ -122,6 +124,22 @@ def _is_xlsx(name: str, mime: str) -> bool:
     return name.lower().endswith((".xlsx", ".xlsm")) or mime in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",)
 
 
+def _is_txt(name: str, mime: str) -> bool:
+    return name.lower().endswith((".txt", ".log")) or mime.startswith("text/")
+
+
+def _is_md(name: str, mime: str) -> bool:
+    return name.lower().endswith((".md", ".markdown"))
+
+
+def _is_tsv(name: str, mime: str) -> bool:
+    return name.lower().endswith(".tsv") or mime in ("text/tab-separated-values", "text/tsv")
+
+
+def _is_json_file(name: str, mime: str) -> bool:
+    return name.lower().endswith(".json") or mime in ("application/json", "text/json")
+
+
 def _extract_docx_text(path: str) -> str:
     try:
         from docx import Document  # type: ignore
@@ -187,6 +205,55 @@ def _extract_xlsx_text(path: str) -> str:
         return "\n".join(lines).strip()
     except Exception as e:
         log(f"XLSX parse failed: {e}")
+        return ""
+
+
+def _extract_text_file(path: str, max_chars: int) -> str:
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+            data = fh.read(max_chars + 1)
+            if len(data) > max_chars:
+                data = data[:max_chars] + "\n[truncated]"
+            return data.strip()
+    except Exception as e:
+        log(f"Text parse failed: {e}")
+        return ""
+
+
+def _extract_tsv_text(path: str) -> str:
+    try:
+        rows = []
+        with open(path, newline="", encoding="utf-8", errors="ignore") as fh:
+            reader = csv.reader(fh, delimiter="\t")
+            for i, row in enumerate(reader):
+                if i >= MAX_CSV_ROWS:
+                    rows.append(["[truncated rows]"])
+                    break
+                rows.append(row[:MAX_CSV_COLS])
+        lines = ["\t".join(row) for row in rows]
+        return "\n".join(lines).strip()
+    except Exception as e:
+        log(f"TSV parse failed: {e}")
+        return ""
+
+
+def _extract_json_text(path: str) -> str:
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read(MAX_JSON_BYTES + 1)
+        truncated = len(data) > MAX_JSON_BYTES
+        if truncated:
+            data = data[:MAX_JSON_BYTES]
+        try:
+            obj = json.loads(data.decode("utf-8", errors="ignore"))
+            text = json.dumps(obj, indent=2)
+        except Exception:
+            text = data.decode("utf-8", errors="ignore")
+        if truncated or len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS] + "\n[truncated]"
+        return text.strip()
+    except Exception as e:
+        log(f"JSON parse failed: {e}")
         return ""
 
 
@@ -330,15 +397,16 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
         mime, _ = mimetypes.guess_type(name)
         mime = mime or "application/octet-stream"
 
-        with open(path, "rb") as fh:
-            b64 = base64.b64encode(fh.read()).decode("utf-8")
-
         if _is_pdf(name, mime):
+            with open(path, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("utf-8")
             pdfs.append({"filename": name or "document.pdf", "base64": b64})
             total_bytes += size
             continue
 
         if _is_image(mime):
+            with open(path, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("utf-8")
             images.append({"url": f"data:{mime};base64,{b64}"})
             total_bytes += size
             continue
@@ -351,6 +419,12 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
             text_block = _extract_csv_text(path)
         elif _is_xlsx(name, mime):
             text_block = _extract_xlsx_text(path)
+        elif _is_tsv(name, mime):
+            text_block = _extract_tsv_text(path)
+        elif _is_md(name, mime) or _is_txt(name, mime):
+            text_block = _extract_text_file(path, MAX_TEXT_CHARS)
+        elif _is_json_file(name, mime):
+            text_block = _extract_json_text(path)
 
         if text_block:
             texts.append(f"=== File: {name} ===\n{text_block}")
