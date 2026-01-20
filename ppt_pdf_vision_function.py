@@ -1,8 +1,9 @@
 """
-title: PPT/PDF Vision Filter (Claude-Style)
+title: PPT/PDF Vision Function
 author: GLChemTec
 version: 7.4
-description: Claude-style PDF processing with AGGRESSIVE token optimization for 200K limit.
+description: Function (Pipe) version - Converts PPT/PDF to images for Claude vision analysis.
+required_open_webui_version: 0.4.0
 """
 
 import os
@@ -10,36 +11,38 @@ import base64
 import subprocess
 import tempfile
 import shutil
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Generator, Iterator, Union
 
 from pydantic import BaseModel, Field
 
 
-class Filter:
+class Pipe:
+    """OpenWebUI Function (Pipe) for PPT/PDF vision processing."""
+    
     class Valves(BaseModel):
-        priority: int = Field(default=0, description="Filter priority")
-        enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
-        libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
+        priority: int = Field(default=0, description="Function priority")
         debug: bool = Field(default=True, description="Enable debug logging")
+        libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
         # Token management - VERY AGGRESSIVE to stay under 200K limit
-        # Rule of thumb: 1KB of base64 ≈ 250-400 tokens for images
-        # Target: ~50KB per image = ~15K tokens per image
-        # 8 images × 15K = 120K tokens (safe under 200K)
         max_pages: int = Field(default=8, description="Max pages (8 pages = ~120K tokens max)")
         dpi: int = Field(default=72, description="DPI for rendering (72 = screen quality)")
         max_image_width: int = Field(default=800, description="Max width in pixels")
         max_image_height: int = Field(default=600, description="Max height in pixels")
         jpeg_quality: int = Field(default=40, description="JPEG quality (40 = good balance)")
         use_jpeg: bool = Field(default=True, description="Use JPEG (much smaller than PNG)")
-        skip_text_extraction: bool = Field(default=True, description="Skip text extraction")
         max_total_base64_mb: float = Field(default=2.0, description="Max total base64 size in MB")
+        # Model to forward to
+        target_model: str = Field(default="anthropic/claude-sonnet-4-20250514", description="Model to forward processed request to")
 
     def __init__(self):
+        self.type = "pipe"
+        self.id = "ppt_pdf_vision"
+        self.name = "PPT/PDF Vision"
         self.valves = self.Valves()
 
     def _log(self, msg: str) -> None:
         if self.valves.debug:
-            print(f"[CLAUDE-STYLE] {msg}")
+            print(f"[PPT/PDF-VISION] {msg}")
 
     def _extract_all_files(self, body: dict, messages: list) -> List[Dict[str, Any]]:
         all_files = []
@@ -97,10 +100,6 @@ class Filter:
             return "\n".join(p for p in parts if p).strip()
         return str(content) if content else ""
 
-    def _is_openai_model(self, model: str) -> bool:
-        m = (model or "").lower()
-        return any(token in m for token in ("gpt-", "openai", "o1-", "o3-", "4o"))
-
     def convert_ppt_to_pdf(self, ppt_path: str, output_dir: str) -> Optional[str]:
         """Convert PPT/PPTX to PDF via LibreOffice."""
         try:
@@ -127,39 +126,6 @@ class Filter:
         except Exception as e:
             self._log(f"PPT->PDF error: {e}")
             return None
-
-    def extract_text_from_pdf(self, pdf_path: str) -> str:
-        """Extract text from PDF using pdfplumber or PyMuPDF."""
-        text_parts = []
-        try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(pdf_path)
-            for page_num, page in enumerate(doc):
-                if page_num >= self.valves.max_pages:
-                    break
-                text = page.get_text()
-                if text.strip():
-                    text_parts.append(f"--- Page {page_num + 1} ---\n{text.strip()}")
-            doc.close()
-            self._log(f"Extracted text from {min(len(text_parts), self.valves.max_pages)} pages")
-        except ImportError:
-            self._log("PyMuPDF not available, trying pdfplumber")
-            try:
-                import pdfplumber
-                with pdfplumber.open(pdf_path) as pdf:
-                    for page_num, page in enumerate(pdf.pages):
-                        if page_num >= self.valves.max_pages:
-                            break
-                        text = page.extract_text() or ""
-                        if text.strip():
-                            text_parts.append(f"--- Page {page_num + 1} ---\n{text.strip()}")
-                self._log(f"Extracted text from {len(text_parts)} pages")
-            except Exception as e:
-                self._log(f"Text extraction failed: {e}")
-        except Exception as e:
-            self._log(f"Text extraction error: {e}")
-        
-        return "\n\n".join(text_parts)
 
     def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
         """Convert PDF pages to optimized images for token efficiency."""
@@ -202,7 +168,7 @@ class Filter:
                 
                 # Check if we're exceeding the total size limit
                 if total_size > max_bytes:
-                    self._log(f"WARNING: Stopping at page {idx+1} - total size {total_size/1024/1024:.1f}MB exceeds limit {self.valves.max_total_base64_mb}MB")
+                    self._log(f"WARNING: Stopping at page {idx+1} - total size {total_size/1024/1024:.1f}MB exceeds limit")
                     paths.append(path)
                     break
                     
@@ -221,48 +187,39 @@ class Filter:
         except:
             return None
 
-    def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
-        self._log("=" * 50)
-        self._log("INLET - Claude-Style Processing (v7.4)")
+    def pipes(self) -> List[dict]:
+        """Return list of available pipes/models."""
+        return [{"id": "ppt_pdf_vision", "name": "PPT/PDF Vision Analyzer"}]
 
-        if not self.valves.enabled:
-            return body
+    def pipe(self, body: dict) -> Union[str, Generator, Iterator]:
+        """Main pipe function - processes PPT/PDF files and forwards to target model."""
+        self._log("=" * 50)
+        self._log("PIPE - PPT/PDF Vision Processing (v7.4)")
 
         messages = body.get("messages", [])
         if not messages:
+            self._log("No messages in body")
             return body
 
         files = self._extract_all_files(body, messages)
         self._log(f"Found {len(files)} file(s) in request")
         
         if not files:
-            self._log("No files found - checking body structure")
-            self._log(f"Body keys: {list(body.keys())}")
+            self._log("No files found - passing through unchanged")
+            # No files to process, forward as-is
+            body["model"] = self.valves.target_model
             return body
 
         all_images = []
-        all_text = []
-
-        use_openai_format = self._is_openai_model(body.get("model", ""))
-        if use_openai_format:
-            self._log("Target looks like OpenAI - using image_url data URLs")
-        else:
-            self._log("Target looks like Claude/Anthropic - using base64 image blocks")
 
         for file_obj in files:
             file_path = self._get_file_path(file_obj)
             file_name = self._get_file_name(file_obj)
             
-            self._log(f"File object: {file_obj}")
-            self._log(f"Extracted path: {file_path}")
-            self._log(f"Extracted name: {file_name}")
+            self._log(f"File: {file_name} at {file_path}")
 
-            if not file_path:
-                self._log(f"No path found for file")
-                continue
-                
-            if not os.path.exists(file_path):
-                self._log(f"File does not exist: {file_path}")
+            if not file_path or not os.path.exists(file_path):
+                self._log(f"File not found: {file_path}")
                 continue
 
             is_ppt = file_name.endswith((".ppt", ".pptx"))
@@ -284,15 +241,8 @@ class Filter:
                     if not pdf_path:
                         continue
 
-                # Stage 2a: Extract text from PDF (optional - can skip to save tokens)
-                if not self.valves.skip_text_extraction:
-                    self._log("Stage 2a: Extracting text from PDF")
-                    extracted_text = self.extract_text_from_pdf(pdf_path)
-                    if extracted_text:
-                        all_text.append(f"=== Document: {file_name} ===\n{extracted_text}")
-
-                # Stage 2b: Convert pages to images
-                self._log("Stage 2b: Converting pages to images")
+                # Stage 2: Convert pages to images
+                self._log("Stage 2: Converting pages to images")
                 image_paths = self.convert_pdf_to_images(pdf_path, tmp_dir)
                 self._log(f"Got {len(image_paths)} image paths")
                 
@@ -302,68 +252,47 @@ class Filter:
                     if b64:
                         b64_size = len(b64)
                         total_b64_size += b64_size
-                        # Estimate tokens: ~250-400 tokens per KB of base64 for images
                         est_tokens = int(b64_size / 1024 * 300)
+                        
                         mime = "image/jpeg" if self.valves.use_jpeg else "image/png"
-
-                        if use_openai_format:
-                            all_images.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime};base64,{b64}"
-                                }
-                            })
-                        else:
-                            all_images.append({
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": mime,
-                                    "data": b64
-                                }
-                            })
-
-                        self._log(
-                            f"Added page {len(all_images)}: {b64_size/1024:.1f}KB "
-                            f"(~{est_tokens} tokens) [{ 'openai' if use_openai_format else 'claude'}]"
-                        )
+                        # Anthropic/Claude format for images
+                        all_images.append({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": mime,
+                                "data": b64
+                            }
+                        })
+                        self._log(f"Added page {len(all_images)}: {b64_size/1024:.1f}KB (~{est_tokens} tokens)")
                 
                 total_est_tokens = int(total_b64_size / 1024 * 300)
                 self._log(f"Total for this file: {total_b64_size/1024/1024:.2f}MB (~{total_est_tokens} tokens)")
 
-        if not all_images and not all_text:
-            self._log("No content extracted from any files")
+        if not all_images:
+            self._log("No images extracted from any files")
+            body["model"] = self.valves.target_model
             return body
 
-        # Stage 3: Combine text + images for the model
-        self._log(f"Stage 3: Combining {len(all_images)} images + {len(all_text)} text sections")
+        # Stage 3: Build the message with images
+        self._log(f"Stage 3: Building message with {len(all_images)} images")
 
         last_message = messages[-1]
         original_prompt = self._extract_text_content(last_message.get("content", ""))
 
-        # Build combined content like Claude does
         combined_text = f"{original_prompt}\n\n"
-        
-        if all_text:
-            combined_text += "[EXTRACTED TEXT FROM DOCUMENT]\n"
-            combined_text += "\n".join(all_text)
-            combined_text += "\n\n"
-        
         combined_text += (
             f"[{len(all_images)} PAGE IMAGES ATTACHED]\n"
-            "Analyze both the extracted text AND the page images. "
-            "For spectra (NMR, HPLC, MS), read peaks, chemical shifts, and labels from the images. "
-            "Cross-reference with the extracted text for accuracy."
+            "Analyze the page images. "
+            "For spectra (NMR, HPLC, MS), read peaks, chemical shifts, and labels from the images."
         )
 
         # Combine: text block + all image blocks
         content_blocks = [{"type": "text", "text": combined_text}] + all_images
         messages[-1]["content"] = content_blocks
         body["messages"] = messages
+        body["model"] = self.valves.target_model
 
-        self._log(f"SUCCESS - Added {len(all_images)} images to message content")
+        self._log(f"SUCCESS - Added {len(all_images)} images, forwarding to {self.valves.target_model}")
         self._log("=" * 50)
-        return body
-
-    def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         return body
