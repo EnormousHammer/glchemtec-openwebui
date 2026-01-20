@@ -98,8 +98,20 @@ class Filter:
         return str(content) if content else ""
 
     def _is_openai_model(self, model: str) -> bool:
+        """
+        Default to OpenAI format unless we explicitly detect Anthropic.
+        This prevents sending Anthropic-style "image" blocks to OpenAI.
+        """
         m = (model or "").lower()
-        return any(token in m for token in ("gpt-", "openai", "o1-", "o3-", "4o"))
+        if not m:
+            return True
+        if "claude" in m or "anthropic" in m:
+            return False
+        return any(token in m for token in ("gpt", "openai", "o1-", "o3-", "4o"))
+
+    def _is_anthropic_model(self, model: str) -> bool:
+        m = (model or "").lower()
+        return "claude" in m or "anthropic" in m
 
     def convert_ppt_to_pdf(self, ppt_path: str, output_dir: str) -> Optional[str]:
         """Convert PPT/PPTX to PDF via LibreOffice."""
@@ -243,9 +255,11 @@ class Filter:
         all_images = []
         all_text = []
 
-        use_openai_format = self._is_openai_model(body.get("model", ""))
-        if use_openai_format:
-            self._log("Target looks like OpenAI - using image_url data URLs")
+        model_name = body.get("model", "")
+        use_openai_format = self._is_openai_model(model_name)
+        use_claude_format = self._is_anthropic_model(model_name)
+        if use_openai_format and not use_claude_format:
+            self._log("Target looks like OpenAI/unknown - using image_url data URLs")
         else:
             self._log("Target looks like Claude/Anthropic - using base64 image blocks")
 
@@ -306,7 +320,7 @@ class Filter:
                         est_tokens = int(b64_size / 1024 * 300)
                         mime = "image/jpeg" if self.valves.use_jpeg else "image/png"
 
-                        if use_openai_format:
+                        if use_openai_format and not use_claude_format:
                             all_images.append({
                                 "type": "image_url",
                                 "image_url": {
