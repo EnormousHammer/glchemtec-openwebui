@@ -36,6 +36,7 @@ MAX_TEXT_CHARS = 40000
 MAX_JSON_BYTES = 1_000_000
 MAX_ZIP_BYTES = 50 * 1024 * 1024
 MAX_ZIP_FILES = 500
+MAX_JCAMP_BYTES = 2 * 1024 * 1024
 
 # Regex to find PDF markers: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
 PDF_MARKER_RE = re.compile(
@@ -160,6 +161,10 @@ def _is_rtf(name: str, mime: str) -> bool:
 
 def _is_bruker_zip(name: str, mime: str) -> bool:
     return name.lower().endswith(".zip") and ("application/zip" in mime or "zip" in mime)
+
+
+def _is_jcamp(name: str, mime: str) -> bool:
+    return name.lower().endswith((".jdx", ".dx", ".jcamp")) or ("jcamp" in mime.lower() if mime else False)
 
 
 def _extract_docx_text(path: str) -> str:
@@ -438,6 +443,83 @@ def _extract_bruker_zip(path: str) -> str:
         return ""
 
 
+def _extract_jcamp_text(path: str) -> str:
+    """
+    Simple JCAMP-DX peak/metadata extraction (no external deps).
+    """
+    try:
+        with open(path, "rb") as fh:
+            raw = fh.read(MAX_JCAMP_BYTES + 1)
+        truncated = len(raw) > MAX_JCAMP_BYTES
+        data = raw[:MAX_JCAMP_BYTES].decode("utf-8", errors="ignore")
+    except Exception as e:
+        log(f"JCAMP read failed: {e}")
+        return ""
+
+    lines = data.splitlines()
+    meta = {}
+    for ln in lines[:200]:  # scan headers
+        l = ln.strip()
+        if not l.startswith("##"):
+            continue
+        if "=" in l:
+            key, val = l[2:].split("=", 1)
+            meta[key.strip().upper()] = val.strip()
+
+    title = meta.get("TITLE", "")
+    nucleus = meta.get(".OBSERVENUCLEUS") or meta.get("NUCLEUS") or meta.get(".NUCLEUS") or ""
+    solvent = meta.get(".SOLVENT") or meta.get("SOLVENT") or meta.get("$SOLVENT") or ""
+    freq = meta.get(".OBSERVEFREQUENCY") or meta.get("OBSERVE FREQUENCY") or meta.get("$SFO1") or ""
+    temp = meta.get(".TEMPERATURE") or meta.get("TEMP") or meta.get("$TE") or ""
+
+    # Extract peak table
+    peak_section = ""
+    if "##PEAKTABLE=" in data:
+        try:
+            start = data.index("##PEAKTABLE=")
+            rest = data[start:].split("##", 2)
+            if len(rest) >= 2:
+                peak_section = rest[1]  # after PEAKTABLE tag until next ##
+            else:
+                peak_section = rest[0]
+        except ValueError:
+            pass
+    peaks = []
+    if peak_section:
+        for ln in peak_section.splitlines():
+            ln = ln.strip()
+            if not ln or ln.startswith("##"):
+                continue
+            # Expect "shift, intensity" pairs
+            parts = [p.strip() for p in ln.replace(";", ",").split(",") if p.strip()]
+            if len(parts) >= 1:
+                try:
+                    shift = float(parts[0])
+                    intensity = float(parts[1]) if len(parts) > 1 else 1.0
+                    peaks.append(f"{shift:.2f} s 1H (int {intensity:.0f})")
+                except Exception:
+                    continue
+
+    body = []
+    if title:
+        body.append(f"Title: {title}")
+    if nucleus:
+        body.append(f"Nucleus: {nucleus}")
+    if solvent:
+        body.append(f"Solvent: {solvent}")
+    if freq:
+        body.append(f"Freq: {freq} MHz")
+    if temp:
+        body.append(f"Temp: {temp}")
+    if peaks:
+        body.append("Peaks:")
+        body.extend(peaks[:200])
+    elif truncated:
+        body.append("[JCAMP truncated; no peaks found]")
+
+    return "\n".join(body).strip()
+
+
 async def _post_with_retry(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, attempts: int = 3, base_delay: float = 1.0, stream: bool = False):
     """
     POST with bounded retry/backoff for transient 429/5xx.
@@ -616,6 +698,8 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
             text_block = _extract_rtf_text(path)
         elif _is_bruker_zip(name, mime):
             text_block = _extract_bruker_zip(path)
+        elif _is_jcamp(name, mime):
+            text_block = _extract_jcamp_text(path)
 
         if text_block:
             texts.append(f"=== File: {name} ===\n{text_block}")
