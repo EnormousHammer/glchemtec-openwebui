@@ -34,6 +34,8 @@ MAX_XLSX_ROWS = 500
 MAX_XLSX_COLS = 50
 MAX_TEXT_CHARS = 40000
 MAX_JSON_BYTES = 1_000_000
+MAX_ZIP_BYTES = 50 * 1024 * 1024
+MAX_ZIP_FILES = 500
 
 # Regex to find PDF markers: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
 PDF_MARKER_RE = re.compile(
@@ -140,6 +142,26 @@ def _is_json_file(name: str, mime: str) -> bool:
     return name.lower().endswith(".json") or mime in ("application/json", "text/json")
 
 
+def _is_doc(name: str, mime: str) -> bool:
+    return name.lower().endswith(".doc") or mime in ("application/msword",)
+
+
+def _is_xls(name: str, mime: str) -> bool:
+    return name.lower().endswith(".xls") or mime in ("application/vnd.ms-excel",)
+
+
+def _is_odt(name: str, mime: str) -> bool:
+    return name.lower().endswith(".odt") or mime in ("application/vnd.oasis.opendocument.text",)
+
+
+def _is_rtf(name: str, mime: str) -> bool:
+    return name.lower().endswith(".rtf") or mime in ("application/rtf", "text/rtf")
+
+
+def _is_bruker_zip(name: str, mime: str) -> bool:
+    return name.lower().endswith(".zip") and ("application/zip" in mime or "zip" in mime)
+
+
 def _extract_docx_text(path: str) -> str:
     try:
         from docx import Document  # type: ignore
@@ -208,6 +230,96 @@ def _extract_xlsx_text(path: str) -> str:
         return ""
 
 
+def _extract_doc_text(path: str) -> str:
+    """
+    Best-effort DOC extraction: try to use textract if available; otherwise return empty.
+    """
+    try:
+        import textract  # type: ignore
+    except Exception:
+        log("DOC parse skipped: textract not available")
+        return ""
+    try:
+        text = textract.process(path).decode("utf-8", errors="ignore")
+        if len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS] + "\n[truncated]"
+        return text.strip()
+    except Exception as e:
+        log(f"DOC parse failed: {e}")
+        return ""
+
+
+def _extract_xls_text(path: str) -> str:
+    """
+    Best-effort XLS extraction via xlrd if available.
+    """
+    try:
+        import xlrd  # type: ignore
+    except Exception:
+        log("XLS parse skipped: xlrd not available")
+        return ""
+    try:
+        book = xlrd.open_workbook(path, on_demand=True)
+        sheet = book.sheet_by_index(0)
+        lines = []
+        for r in range(min(sheet.nrows, MAX_XLSX_ROWS)):
+            row_vals = []
+            for c in range(min(sheet.ncols, MAX_XLSX_COLS)):
+                val = sheet.cell_value(r, c)
+                row_vals.append("" if val is None else str(val))
+            lines.append("\t".join(row_vals))
+        text = "\n".join(lines)
+        if len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS] + "\n[truncated]"
+        return text.strip()
+    except Exception as e:
+        log(f"XLS parse failed: {e}")
+        return ""
+
+
+def _extract_odt_text(path: str) -> str:
+    try:
+        from odf.opendocument import load  # type: ignore
+        from odf import text as odf_text  # type: ignore
+    except Exception:
+        log("ODT parse skipped: odfpy not available")
+        return ""
+    try:
+        doc = load(path)
+        paras = []
+        for p in doc.getElementsByType(odf_text.P):
+            txt = "".join(t.data for t in p.childNodes if hasattr(t, "data"))
+            if txt:
+                paras.append(txt)
+            if sum(len(x) for x in paras) > MAX_TEXT_CHARS:
+                break
+        text = "\n".join(paras)
+        if len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS] + "\n[truncated]"
+        return text.strip()
+    except Exception as e:
+        log(f"ODT parse failed: {e}")
+        return ""
+
+
+def _extract_rtf_text(path: str) -> str:
+    try:
+        from striprtf.striprtf import rtf_to_text  # type: ignore
+    except Exception:
+        log("RTF parse skipped: striprtf not available")
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+            data = fh.read()
+        text = rtf_to_text(data)
+        if len(text) > MAX_TEXT_CHARS:
+            text = text[:MAX_TEXT_CHARS] + "\n[truncated]"
+        return text.strip()
+    except Exception as e:
+        log(f"RTF parse failed: {e}")
+        return ""
+
+
 def _extract_text_file(path: str, max_chars: int) -> str:
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as fh:
@@ -254,6 +366,75 @@ def _extract_json_text(path: str) -> str:
         return text.strip()
     except Exception as e:
         log(f"JSON parse failed: {e}")
+        return ""
+
+
+def _extract_bruker_zip(path: str) -> str:
+    """
+    Parse Bruker NMR zip for key metadata. Metadata-only (no peak picking).
+    """
+    import zipfile
+    try:
+        if os.path.getsize(path) > MAX_ZIP_BYTES:
+            raise HTTPException(status_code=400, detail=f"Zip too large (> {MAX_ZIP_BYTES/1024/1024:.0f} MB)")
+        with zipfile.ZipFile(path, "r") as zf:
+            namelist = zf.namelist()
+            if len(namelist) > MAX_ZIP_FILES:
+                raise HTTPException(status_code=400, detail="Zip has too many entries")
+
+            # Detect Bruker structure
+            lower_names = [n.lower() for n in namelist]
+            if not any("acqus" in n for n in lower_names):
+                return ""
+
+            def read_text_member(name):
+                try:
+                    with zf.open(name, "r") as fh:
+                        return fh.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    return ""
+
+            meta_sections = []
+
+            acqus_files = [n for n in namelist if n.lower().endswith("acqus")]
+            procs_files = [n for n in namelist if n.lower().endswith("procs")]
+            title_files = [n for n in namelist if n.lower().endswith("title")]
+
+            def parse_param(block, keys):
+                lines = block.splitlines()
+                out = []
+                for key in keys:
+                    for line in lines:
+                        if line.strip().startswith(f"##${key}="):
+                            out.append(f"{key}: {line.split('=',1)[1].strip()}")
+                            break
+                return out
+
+            if acqus_files:
+                data = read_text_member(acqus_files[0])
+                vals = parse_param(data, ["SW", "TD", "O1", "SFO1", "NUC1", "TE", "RG", "D", "NS", "DATE"])
+                if vals:
+                    meta_sections.append("ACQUS:\n" + "\n".join(vals))
+
+            if procs_files:
+                data = read_text_member(procs_files[0])
+                vals = parse_param(data, ["SF", "SI", "SSB", "LB", "WDW"])
+                if vals:
+                    meta_sections.append("PROCS:\n" + "\n".join(vals))
+
+            if title_files:
+                data = read_text_member(title_files[0])
+                if data.strip():
+                    meta_sections.append("TITLE:\n" + data.strip())
+
+            if not meta_sections:
+                return ""
+
+            return "\n\n".join(meta_sections)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log(f"Bruker zip parse failed: {e}")
         return ""
 
 
@@ -411,7 +592,7 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
             total_bytes += size
             continue
 
-        # Text-first ingestion for DOCX/CSV/XLSX
+        # Text-first ingestion for DOCX/CSV/XLSX/others
         text_block = ""
         if _is_docx(name, mime):
             text_block = _extract_docx_text(path)
@@ -425,6 +606,16 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
             text_block = _extract_text_file(path, MAX_TEXT_CHARS)
         elif _is_json_file(name, mime):
             text_block = _extract_json_text(path)
+        elif _is_doc(name, mime):
+            text_block = _extract_doc_text(path)
+        elif _is_xls(name, mime):
+            text_block = _extract_xls_text(path)
+        elif _is_odt(name, mime):
+            text_block = _extract_odt_text(path)
+        elif _is_rtf(name, mime):
+            text_block = _extract_rtf_text(path)
+        elif _is_bruker_zip(name, mime):
+            text_block = _extract_bruker_zip(path)
 
         if text_block:
             texts.append(f"=== File: {name} ===\n{text_block}")
