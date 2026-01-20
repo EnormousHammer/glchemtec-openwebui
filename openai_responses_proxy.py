@@ -15,10 +15,23 @@ import base64
 import mimetypes
 import httpx
 import csv
+import io
+import uuid
+import math
+import time
+from pathlib import Path
 from typing import Optional, List, Dict, Any
+from urllib.parse import quote_plus
 from fastapi import FastAPI, Request, HTTPException  # type: ignore
-from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse  # type: ignore
 import asyncio
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage  # type: ignore
+from reportlab.lib.pagesizes import letter  # type: ignore
+from reportlab.lib.styles import getSampleStyleSheet  # type: ignore
+from reportlab.lib import colors  # type: ignore
+from docx import Document  # type: ignore
+from docx.shared import Pt  # type: ignore
+from openpyxl import load_workbook  # type: ignore
 
 app = FastAPI(title="OpenAI Responses Proxy")
 
@@ -37,6 +50,16 @@ MAX_JSON_BYTES = 1_000_000
 MAX_ZIP_BYTES = 50 * 1024 * 1024
 MAX_ZIP_FILES = 500
 MAX_JCAMP_BYTES = 2 * 1024 * 1024
+
+# Simple in-memory metrics (non-persistent)
+METRICS = {
+    "requests_total": 0,
+    "responses_api_calls": 0,
+    "chat_completions_calls": 0,
+    "errors_total": 0,
+    "last_error": "",
+    "last_latency_ms": 0.0,
+}
 
 # Regex to find PDF markers: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
 PDF_MARKER_RE = re.compile(
@@ -716,6 +739,8 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
     """
     Call OpenAI Responses API with PDF files and/or images.
     """
+    _content_filter(user_text or "")
+    METRICS["responses_api_calls"] += 1
     content_items = []
     
     # Add PDF files first (using data URL format)
@@ -775,12 +800,13 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
                 "Content-Type": "application/json",
             },
             payload=payload,
+            attempts=3,
+            base_delay=1.0,
+            stream=False,
         )
-        
         if resp.status_code >= 400:
             log(f"Responses API error: {resp.status_code} - {resp.text}")
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        
         return resp.json()
 
 
@@ -788,6 +814,8 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
     """
     Stream OpenAI Responses API SSE and convert to chat-completion chunks.
     """
+    _content_filter(user_text or "")
+    METRICS["responses_api_calls"] += 1
     content_items = []
     
     for pdf in pdfs:
@@ -899,19 +927,21 @@ async def call_chat_completions(body: dict) -> dict:
     Forward to standard Chat Completions API (fallback when no PDFs).
     """
     async with httpx.AsyncClient(timeout=300.0) as client:
-        resp = await client.post(
+        resp = await _post_with_retry(
+            client,
             f"{OPENAI_BASE_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
                 "Content-Type": "application/json",
             },
-            json=body
+            payload=body,
+            attempts=3,
+            base_delay=1.0,
+            stream=False,
         )
-        
         if resp.status_code >= 400:
             log(f"Chat Completions error: {resp.status_code}")
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        
         return resp.json()
 
 
@@ -948,6 +978,8 @@ async def chat_completions(request: Request):
     """
     Main endpoint - intercepts Chat Completions, upgrades to Responses API if PDFs found.
     """
+    start = time.perf_counter()
+    METRICS["requests_total"] += 1
     body = await request.json()
     
     model = body.get("model", "gpt-4o")
@@ -1033,6 +1065,8 @@ async def chat_completions(request: Request):
             return JSONResponse(content=result)
             
         except Exception as e:
+            METRICS["errors_total"] += 1
+            METRICS["last_error"] = str(e)
             log(f"Responses API failed: {e}")
             # Fall back to chat completions
             pass
@@ -1070,8 +1104,497 @@ async def chat_completions(request: Request):
         
         return StreamingResponse(stream_response(), media_type="text/event-stream")
     
-    result = await call_chat_completions(body)
+    try:
+        result = await call_chat_completions(body)
+    except Exception as e:
+        METRICS["errors_total"] += 1
+        METRICS["last_error"] = str(e)
+        raise
+    latency_ms = (time.perf_counter() - start) * 1000
+    METRICS["last_latency_ms"] = latency_ms
     return JSONResponse(content=result)
+
+
+def _safe_slug(text: str, default: str = "report") -> str:
+    """Create a simple filename-safe slug."""
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", text).strip("-")
+    return slug or default
+
+def _is_enabled(env_key: str, default: bool = True) -> bool:
+    return os.environ.get(env_key, "true" if default else "false").lower() == "true"
+
+
+def _content_filter(text: str) -> None:
+    """Basic content filter hook."""
+    banned = ["password", "apikey", "secret", "token", "private key"]
+    lower = text.lower()
+    if any(b in lower for b in banned):
+        raise HTTPException(status_code=400, detail="Content blocked by filter")
+
+
+async def _post_with_retry(client: httpx.AsyncClient, url: str, headers: dict, payload: dict, attempts: int = 3, base_delay: float = 1.0, stream: bool = False):
+    for i in range(attempts):
+        try:
+            if stream:
+                resp = await client.stream("POST", url, headers=headers, json=payload)
+            else:
+                resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code in (429, 500, 502, 503, 504) and i < attempts - 1:
+                await asyncio.sleep(base_delay * (2 ** i))
+                continue
+            resp.raise_for_status()
+            return resp
+        except Exception:
+            if i == attempts - 1:
+                raise
+            await asyncio.sleep(base_delay * (2 ** i))
+
+
+def render_report_pdf(report: dict) -> bytes:
+    """
+    Render a simple, professional PDF report.
+    Expected keys: title, subtitle, author, date, sections [{heading, body, bullets, table{headers, rows}, images[{url,data_url,caption}]}], footer.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    flow = []
+
+    title = report.get("title") or "Report"
+    subtitle = report.get("subtitle", "")
+    author = report.get("author", "")
+    date = report.get("date", "")
+    footer = report.get("footer", "")
+    sections = report.get("sections", [])
+
+    flow.append(Paragraph(title, styles["Title"]))
+    if subtitle:
+        flow.append(Paragraph(subtitle, styles["Heading3"]))
+    if author or date:
+        meta = " | ".join([x for x in [author, date] if x])
+        if meta:
+            flow.append(Paragraph(meta, styles["Normal"]))
+    flow.append(Spacer(1, 12))
+
+    for sec in sections:
+        heading = sec.get("heading", "")
+        body = sec.get("body", "")
+        bullets = sec.get("bullets", [])
+        table = sec.get("table")
+        images = sec.get("images", [])
+
+        if heading:
+            flow.append(Paragraph(heading, styles["Heading2"]))
+        if body:
+            flow.append(Paragraph(body.replace("\n", "<br/>"), styles["Normal"]))
+        if bullets and isinstance(bullets, list):
+            for b in bullets:
+                flow.append(Paragraph(f"• {b}", styles["Normal"]))
+        if table and isinstance(table, dict):
+            headers = table.get("headers", [])
+            rows = table.get("rows", [])
+            data = []
+            if headers:
+                data.append(headers)
+            data.extend(rows)
+            if data:
+                t = Table(data, repeatRows=1)
+                t.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6eef5")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1d2b3a")),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                flow.append(Spacer(1, 6))
+                flow.append(t)
+        if images and isinstance(images, list):
+            for img in images[:5]:  # limit
+                src = img.get("data_url") or img.get("url") or ""
+                caption = img.get("caption", "")
+                img_bytes = None
+                if src.startswith("data:"):
+                    try:
+                        b64data = src.split(",", 1)[1]
+                        img_bytes = base64.b64decode(b64data)
+                    except Exception:
+                        img_bytes = None
+                elif os.path.exists(src):
+                    with open(src, "rb") as f:
+                        img_bytes = f.read()
+                if img_bytes:
+                    tmp = io.BytesIO(img_bytes)
+                    try:
+                        flow.append(RLImage(tmp, width=400, preserveAspectRatio=True))
+                        if caption:
+                            flow.append(Paragraph(caption, styles["Italic"]))
+                    except Exception:
+                        pass
+        flow.append(Spacer(1, 12))
+
+    if footer:
+        flow.append(Spacer(1, 24))
+        flow.append(Paragraph(footer, styles["Normal"]))
+
+    doc.build(flow)
+    return buffer.getvalue()
+
+
+def render_report_docx(report: dict) -> bytes:
+    """Render a DOCX report with similar structure."""
+    doc = Document()
+    title = report.get("title") or "Report"
+    subtitle = report.get("subtitle", "")
+    author = report.get("author", "")
+    date = report.get("date", "")
+    sections = report.get("sections", [])
+    footer = report.get("footer", "")
+
+    doc.add_heading(title, level=1)
+    if subtitle:
+        doc.add_paragraph(subtitle)
+    meta = " | ".join([x for x in [author, date] if x])
+    if meta:
+        doc.add_paragraph(meta)
+    doc.add_paragraph("")
+
+    for sec in sections:
+        heading = sec.get("heading", "")
+        body = sec.get("body", "")
+        bullets = sec.get("bullets", [])
+        table = sec.get("table")
+        images = sec.get("images", [])
+
+        if heading:
+            doc.add_heading(heading, level=2)
+        if body:
+            doc.add_paragraph(body)
+        if bullets and isinstance(bullets, list):
+            for b in bullets:
+                para = doc.add_paragraph(style="List Bullet")
+                para.add_run(str(b))
+        if table and isinstance(table, dict):
+            headers = table.get("headers", [])
+            rows = table.get("rows", [])
+            if headers or rows:
+                cols = len(headers) if headers else len(rows[0])
+                t = doc.add_table(rows=1, cols=cols)
+                hdr_cells = t.rows[0].cells
+                for i, h in enumerate(headers):
+                    hdr_cells[i].text = str(h)
+                for row in rows:
+                    cells = t.add_row().cells
+                    for i, val in enumerate(row):
+                        cells[i].text = str(val)
+        if images and isinstance(images, list):
+            for img in images[:5]:
+                src = img.get("data_url") or img.get("url") or ""
+                caption = img.get("caption", "")
+                img_bytes = None
+                if src.startswith("data:"):
+                    try:
+                        b64data = src.split(",", 1)[1]
+                        img_bytes = base64.b64decode(b64data)
+                    except Exception:
+                        img_bytes = None
+                elif os.path.exists(src):
+                    with open(src, "rb") as f:
+                        img_bytes = f.read()
+                if img_bytes:
+                    tmp = io.BytesIO(img_bytes)
+                    try:
+                        doc.add_picture(tmp, width=None)
+                        if caption:
+                            doc.add_paragraph(caption).italic = True
+                    except Exception:
+                        pass
+        doc.add_paragraph("")
+
+    if footer:
+        doc.add_paragraph(footer)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def summarize_csv_tsv(text: str, delimiter: str = ",", max_rows: int = 1000, max_cols: int = 50) -> dict:
+    rows = []
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    for i, row in enumerate(reader):
+        if i >= max_rows:
+            break
+        if len(row) > max_cols:
+            row = row[:max_cols]
+        rows.append(row)
+    if not rows:
+        return {"rows": 0, "cols": 0, "headers": [], "sample": []}
+    headers = rows[0]
+    data_rows = rows[1:]
+    sample = data_rows[:5]
+    return {
+        "rows": len(rows) - 1,
+        "cols": len(headers),
+        "headers": headers,
+        "sample": sample,
+    }
+
+
+def summarize_xlsx(content: bytes, max_rows: int = 1000, max_cols: int = 50) -> dict:
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+    sheet = wb.active
+    headers = []
+    data = []
+    for r_idx, row in enumerate(sheet.iter_rows(max_row=max_rows, max_col=max_cols, values_only=True)):
+        vals = ["" if v is None else v for v in row]
+        if r_idx == 0:
+            headers = vals
+        else:
+            data.append(vals)
+        if len(data) >= max_rows:
+            break
+    return {
+        "rows": len(data),
+        "cols": len(headers),
+        "headers": headers,
+        "sample": data[:5],
+    }
+
+
+def summarize_json(content: bytes, max_bytes: int = 1_000_000) -> dict:
+    if len(content) > max_bytes:
+        raise ValueError("JSON too large")
+    obj = json.loads(content)
+    def safe_repr(o, max_len=200):
+        s = repr(o)
+        return s if len(s) <= max_len else s[:max_len] + "..."
+    summary = {
+        "type": type(obj).__name__,
+    }
+    if isinstance(obj, dict):
+        keys = list(obj.keys())
+        summary["keys"] = keys[:50]
+        summary["len"] = len(obj)
+    elif isinstance(obj, list):
+        summary["len"] = len(obj)
+        if obj and isinstance(obj[0], dict):
+            keys = set()
+            for item in obj[:20]:
+                if isinstance(item, dict):
+                    keys.update(item.keys())
+            summary["keys"] = list(keys)[:50]
+        summary["sample"] = safe_repr(obj[:3])
+    else:
+        summary["value"] = safe_repr(obj)
+    return summary
+
+
+def analyze_file_payload(payload: dict) -> dict:
+    """
+    Analyze a file payload with base64 content.
+    Expected keys: filename, content_base64, content_type?
+    Supports CSV/TSV/XLSX/JSON (lightweight summary).
+    """
+    filename = payload.get("filename", "")
+    b64 = payload.get("content_base64", "")
+    ctype = payload.get("content_type", "")
+    if not filename or not b64:
+        raise HTTPException(status_code=400, detail="filename and content_base64 are required")
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 content")
+
+    max_bytes = 5 * 1024 * 1024
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+
+    name_lower = filename.lower()
+    if name_lower.endswith(".csv"):
+        text = raw.decode("utf-8", errors="replace")
+        summary = summarize_csv_tsv(text, delimiter=",")
+        return {"kind": "csv", "summary": summary}
+    if name_lower.endswith(".tsv"):
+        text = raw.decode("utf-8", errors="replace")
+        summary = summarize_csv_tsv(text, delimiter="\\t")
+        return {"kind": "tsv", "summary": summary}
+    if name_lower.endswith(".xlsx"):
+        summary = summarize_xlsx(raw)
+        return {"kind": "xlsx", "summary": summary}
+    if name_lower.endswith(".json") or "json" in ctype:
+        summary = summarize_json(raw)
+        return {"kind": "json", "summary": summary}
+
+    raise HTTPException(status_code=400, detail="Unsupported file type for analysis")
+
+
+def _decode_data_url(data_url: str) -> bytes:
+    if not data_url.startswith("data:"):
+        raise ValueError("Not a data URL")
+    try:
+        b64data = data_url.split(",", 1)[1]
+        return base64.b64decode(b64data)
+    except Exception as e:
+        raise ValueError(f"Invalid data URL: {e}")
+
+
+def _prepare_audio_bytes(payload: dict, max_bytes: int = 5 * 1024 * 1024) -> bytes:
+    """
+    Accepts either content_base64 or data_url in payload["audio"].
+    """
+    audio = payload.get("audio") or {}
+    b64 = audio.get("content_base64", "")
+    data_url = audio.get("data_url", "")
+    raw = b""
+    if b64:
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid audio base64")
+    elif data_url:
+        try:
+            raw = _decode_data_url(data_url)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    else:
+        raise HTTPException(status_code=400, detail="audio.content_base64 or audio.data_url is required")
+
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=400, detail="Audio too large (max 5MB)")
+    return raw
+
+
+async def openai_transcribe_audio(raw: bytes, filename: str = "audio.wav", model: str = "whisper-1") -> str:
+    files = {"file": (filename, raw, "audio/wav")}
+    data = {"model": model}
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(f"{OPENAI_BASE_URL}/audio/transcriptions", headers=headers, files=files, data=data)
+            resp.raise_for_status()
+            return resp.json().get("text", "")
+    except Exception as e:
+        log(f"Transcription failed: {e}")
+        raise HTTPException(status_code=502, detail="Transcription failed")
+
+
+async def openai_tts(text: str, voice: str = "alloy", model: str = "tts-1") -> bytes:
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    payload = {"model": model, "voice": voice, "input": text}
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(f"{OPENAI_BASE_URL}/audio/speech", headers=headers, json=payload)
+            resp.raise_for_status()
+            return resp.content
+    except Exception as e:
+        log(f"TTS failed: {e}")
+        raise HTTPException(status_code=502, detail="TTS failed")
+
+
+
+@app.post("/v1/report/pdf")
+async def generate_report_pdf(report: dict):
+    """Generate a PDF report from structured JSON."""
+    try:
+        pdf_bytes = render_report_pdf(report)
+    except Exception as e:
+        log(f"PDF generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+    filename = _safe_slug(report.get("title", "report")) + ".pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/v1/report/docx")
+async def generate_report_docx(report: dict):
+    """Generate a DOCX report from structured JSON."""
+    try:
+        docx_bytes = render_report_docx(report)
+    except Exception as e:
+        log(f"DOCX generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"DOCX generation failed: {e}")
+
+    filename = _safe_slug(report.get("title", "report")) + ".docx"
+    return StreamingResponse(
+        io.BytesIO(docx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/v1/tools/analyze-file")
+async def analyze_file_tool(payload: dict):
+    if not _is_enabled("ENABLE_ANALYZE_TOOL", default=True):
+        raise HTTPException(status_code=403, detail="Analyze tool disabled")
+    report = analyze_file_payload(payload)
+    return JSONResponse(content=report)
+
+
+@app.post("/v1/tools/search")
+async def search_tool(payload: dict):
+    if not _is_enabled("ENABLE_SEARCH_TOOL", default=True):
+        raise HTTPException(status_code=403, detail="Search tool disabled")
+    query = (payload.get("query") or "").strip()
+    if not query or len(query) > 200:
+        raise HTTPException(status_code=400, detail="Invalid query")
+    banned = ["password", "secret", "token", "apikey"]
+    if any(word in query.lower() for word in banned):
+        raise HTTPException(status_code=400, detail="Query not allowed")
+
+    url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_redirect=1&no_html=1"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "glchemtec-search"})
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        log(f"Search failed: {e}")
+        raise HTTPException(status_code=502, detail="Search failed")
+
+    results = []
+    topics = data.get("RelatedTopics", []) or []
+    results_raw = data.get("Results", []) or []
+    for item in results_raw:
+        t = item.get("Text")
+        u = item.get("FirstURL")
+        if t and u:
+            results.append({"title": t, "url": u})
+    for item in topics:
+        if isinstance(item, dict):
+            t = item.get("Text")
+            u = item.get("FirstURL")
+            if t and u:
+                results.append({"title": t, "url": u})
+        if len(results) >= 5:
+            break
+
+    return JSONResponse(content={"query": query, "results": results[:5]})
+
+
+@app.post("/v1/tools/transcribe")
+async def transcribe_tool(payload: dict):
+    if not _is_enabled("ENABLE_AUDIO_TOOLS", default=True):
+        raise HTTPException(status_code=403, detail="Audio tools disabled")
+    text = await openai_transcribe_audio(_prepare_audio_bytes(payload))
+    return JSONResponse(content={"text": text})
+
+
+@app.post("/v1/tools/tts")
+async def tts_tool(payload: dict):
+    if not _is_enabled("ENABLE_AUDIO_TOOLS", default=True):
+        raise HTTPException(status_code=403, detail="Audio tools disabled")
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    voice = (payload.get("voice") or "alloy").strip()
+    audio_bytes = await openai_tts(text, voice=voice)
+    return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/mpeg")
 
 
 @app.get("/v1/models")
@@ -1083,6 +1606,12 @@ async def list_models():
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"}
         )
         return JSONResponse(content=resp.json())
+
+
+@app.get("/metrics")
+async def metrics():
+    """Simple in-memory metrics snapshot."""
+    return JSONResponse(content=METRICS)
 
 
 @app.get("/health")

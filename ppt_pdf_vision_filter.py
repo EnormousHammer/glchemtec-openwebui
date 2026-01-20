@@ -117,13 +117,23 @@ class Filter:
         """Convert PPT/PPTX to PDF via LibreOffice."""
         try:
             lo = shutil.which("libreoffice") or shutil.which("soffice")
+            # Check common Windows installation paths if not in PATH
+            if not lo and os.name == 'nt':
+                win_paths = [
+                    r"C:\Program Files\LibreOffice\program\soffice.exe",
+                    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                ]
+                for path in win_paths:
+                    if os.path.exists(path):
+                        lo = path
+                        break
             if not lo:
                 self._log("LibreOffice not found")
                 return None
 
             profile_dir = tempfile.mkdtemp(prefix="lo_")
             env = os.environ.copy()
-            env["HOME"] = "/tmp"
+            env["HOME"] = os.path.expanduser("~") if os.name != 'nt' else os.environ.get("TEMP", "C:\\Temp")
 
             cmd = [lo, "--headless", "--nologo", "--nofirststartwizard",
                 f"-env:UserInstallation=file://{profile_dir}",
@@ -296,6 +306,7 @@ class Filter:
                     self._log("Stage 1: PPT -> PDF")
                     pdf_path = self.convert_ppt_to_pdf(file_path, tmp_dir)
                     if not pdf_path:
+                        self._log(f"ERROR: PPT->PDF conversion failed for {file_name}. Skipping file.")
                         continue
 
                 # Stage 2a: Extract text from PDF (optional - can skip to save tokens)
@@ -366,8 +377,8 @@ class Filter:
         combined_text += (
             f"[{len(all_images)} PAGE IMAGES ATTACHED]\n"
             "Analyze both the extracted text AND the page images. "
-            "For spectra (NMR, HPLC, MS), read peaks, chemical shifts, and labels from the images. "
-            "Cross-reference with the extracted text for accuracy."
+            "For NMR, give the spectrum title and a concise peak table (shift, multiplicity, J, integration). "
+            "Skip dumping raw ppm lists or placeholder labels. Provide an ACS-style summary; keep other findings concise."
         )
 
         # Combine: text block + all image blocks
