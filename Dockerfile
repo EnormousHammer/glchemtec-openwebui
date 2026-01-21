@@ -43,9 +43,11 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # Copy proxy script, filters, and startup script
 COPY openai_responses_proxy.py /app/openai_responses_proxy.py
-# Place filter in both default locations to ensure auto-load
+# Place filters in both default locations to ensure auto-load
 COPY ppt_pdf_vision_filter.py /app/backend/filters/ppt_pdf_vision_filter.py
 COPY ppt_pdf_vision_filter.py /app/backend/custom/filters/ppt_pdf_vision_filter.py
+COPY export_filter.py /app/backend/filters/export_filter.py
+COPY export_filter.py /app/backend/custom/filters/export_filter.py
 COPY start.sh /app/start.sh
 
 # Create directories with proper permissions for NLTK and other data

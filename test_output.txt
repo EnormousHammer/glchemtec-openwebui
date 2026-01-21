@@ -1,0 +1,58 @@
+================================================================================
+PPT/PDF VISION FILTER TEST OUTPUT
+================================================================================
+
+Timestamp: 2026-01-20T10:37:01.342102
+Test File: C:\APPLICATIONS MADE BY ME\WINDOWS\glchemtec_openwebui\test_files\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx
+File Exists: True
+
+=== FILTER LOGS ===
+[CLAUDE-STYLE] ==================================================
+[CLAUDE-STYLE] INLET - Claude-Style Processing (v7.4)
+[CLAUDE-STYLE] Found 1 file(s) in request
+[CLAUDE-STYLE] Target looks like OpenAI/unknown - using image_url data URLs
+[CLAUDE-STYLE] File object: {'path': 'C:\\APPLICATIONS MADE BY ME\\WINDOWS\\glchemtec_openwebui\\test_files\\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}
+[CLAUDE-STYLE] Extracted path: C:\APPLICATIONS MADE BY ME\WINDOWS\glchemtec_openwebui\test_files\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx
+[CLAUDE-STYLE] Extracted name: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[CLAUDE-STYLE] Processing: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[CLAUDE-STYLE] Stage 1: PPT -> PDF
+[CLAUDE-STYLE] No content extracted from any files
+
+
+=== ANALYSIS ===
+{
+  "timestamp": "2026-01-20T10:37:01.342102",
+  "input_file": "C:\\APPLICATIONS MADE BY ME\\WINDOWS\\glchemtec_openwebui\\test_files\\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx",
+  "file_exists": true,
+  "messages_count": 1,
+  "last_message_role": "user",
+  "content_type": "str",
+  "image_url_blocks": 0,
+  "image_blocks": 0,
+  "text_blocks": 0,
+  "total_content_items": 0,
+  "first_image_preview": null,
+  "filter_logs": "[CLAUDE-STYLE] ==================================================\n[CLAUDE-STYLE] INLET - Claude-Style Processing (v7.4)\n[CLAUDE-STYLE] Found 1 file(s) in request\n[CLAUDE-STYLE] Target looks like OpenAI/unknown - using image_url data URLs\n[CLAUDE-STYLE] File object: {'path': 'C:\\\\APPLICATIONS MADE BY ME\\\\WINDOWS\\\\glchemtec_openwebui\\\\test_files\\\\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}\n[CLAUDE-STYLE] Extracted path: C:\\APPLICATIONS MADE BY ME\\WINDOWS\\glchemtec_openwebui\\test_files\\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx\n[CLAUDE-STYLE] Extracted name: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx\n[CLAUDE-STYLE] Processing: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx\n[CLAUDE-STYLE] Stage 1: PPT -> PDF\n[CLAUDE-STYLE] No content extracted from any files\n",
+  "content_is_string": true,
+  "content_length": 83
+}
+
+=== RESULT MESSAGE CONTENT (first 2000 chars) ===
+Analyze this presentation and extract all HPLC data, NMR spectra, and key findings.
+
+=== FULL RESULT BODY (truncated) ===
+{
+  "model": "gpt-4o",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze this presentation and extract all HPLC data, NMR spectra, and key findings."
+    }
+  ],
+  "files": [
+    {
+      "path": "C:\\APPLICATIONS MADE BY ME\\WINDOWS\\glchemtec_openwebui\\test_files\\GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx",
+      "name": "GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx"
+    }
+  ]
+}

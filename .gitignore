@@ -1,5 +1,6 @@
 # Credentials and sensitive information
 credentials.txt
+RENDER_API_KEY.md
 *.env
 .env.local
 .env.*.local
