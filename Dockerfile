@@ -43,7 +43,8 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # Copy proxy script, filters, and startup script
 COPY openai_responses_proxy.py /app/openai_responses_proxy.py
-COPY ppt_pdf_vision_filter.py /app/backend/custom/filters/ppt_pdf_vision_filter.py
+# Place filter where OpenWebUI auto-discovers filters
+COPY ppt_pdf_vision_filter.py /app/backend/filters/ppt_pdf_vision_filter.py
 COPY start.sh /app/start.sh
 
 # Create directories with proper permissions for NLTK and other data
@@ -51,12 +52,12 @@ RUN mkdir -p /home/user/nltk_data && \
     mkdir -p /app/data && \
     mkdir -p /app/uploads && \
     mkdir -p /tmp/libreoffice && \
-    mkdir -p /app/backend/custom/filters && \
+    mkdir -p /app/backend/filters && \
     chmod -R 777 /home/user/nltk_data && \
     chmod -R 777 /app/data && \
     chmod -R 777 /app/uploads && \
     chmod -R 777 /tmp/libreoffice && \
-    chmod -R 755 /app/backend/custom && \
+    chmod -R 755 /app/backend && \
     chmod +x /app/openai_responses_proxy.py && \
     chmod +x /app/start.sh
 
