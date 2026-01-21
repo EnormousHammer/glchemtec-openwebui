@@ -6,7 +6,7 @@ services:
     dockerContext: .
     plan: standard
     region: oregon
-    healthCheckPath: /health
+    healthCheckPath: /
     autoDeploy: true
     envVars:
       - key: OPENAI_API_KEY
