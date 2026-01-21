@@ -37,52 +37,9 @@ RUN apt-get update && apt-get install -y \
     # Configure ImageMagick to allow PDF processing
     && sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml 2>/dev/null || true
 
-# Install Python libraries for full document processing (ChatGPT-like capabilities)
-RUN pip3 install --no-cache-dir \
-    # PDF processing
-    pypdf2 \
-    pdfplumber \
-    pymupdf \
-    pdf2image \
-    # Office documents
-    python-pptx \
-    python-docx \
-    openpyxl \
-    xlrd \
-    # Data processing
-    pandas \
-    numpy \
-    # Images and OCR
-    pillow \
-    pytesseract \
-    # Web/HTML/Markdown
-    markdown \
-    beautifulsoup4 \
-    lxml \
-    html2text \
-    # NLP and text processing
-    nltk \
-    chardet \
-    # CSV and data formats
-    csvkit \
-    # Audio transcription (if needed)
-    pydub \
-    # File type detection
-    python-magic \
-    # Archive handling
-    rarfile \
-    py7zr \
-    # PDF generation for exports
-    reportlab \
-    # Chart and graph generation
-    matplotlib \
-    plotly \
-    kaleido \
-    seaborn \
-    # Proxy dependencies
-    fastapi \
-    uvicorn \
-    httpx
+# Install Python libraries from requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # Copy proxy script, filters, and startup script
 COPY openai_responses_proxy.py /app/openai_responses_proxy.py
