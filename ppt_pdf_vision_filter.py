@@ -204,10 +204,91 @@ class Filter:
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
 
+    def _extract_image_from_shape(self, shape, slide_num: int) -> Optional[Dict[str, Any]]:
+        """Extract image from a shape, handling various shape types."""
+        try:
+            # Direct image shape
+            if hasattr(shape, "image"):
+                image = shape.image
+                image_bytes = image.blob
+                
+                # Convert to base64
+                b64_data = base64.b64encode(image_bytes).decode("utf-8")
+                
+                # Determine mime type from image extension
+                ext = image.ext
+                if ext.lower() in ("png", ".png"):
+                    mime_type = "image/png"
+                elif ext.lower() in ("jpg", "jpeg", ".jpg", ".jpeg"):
+                    mime_type = "image/jpeg"
+                elif ext.lower() in ("gif", ".gif"):
+                    mime_type = "image/gif"
+                else:
+                    mime_type = "image/png"  # Default
+                
+                return {
+                    "data": b64_data,
+                    "base64": b64_data,
+                    "content_type": mime_type,
+                    "slide_number": slide_num
+                }
+            
+            # Picture shape (alternative attribute)
+            if hasattr(shape, "image") or (hasattr(shape, "shape_type") and "picture" in str(shape.shape_type).lower()):
+                try:
+                    if hasattr(shape, "image"):
+                        image = shape.image
+                        image_bytes = image.blob
+                        b64_data = base64.b64encode(image_bytes).decode("utf-8")
+                        ext = getattr(image, "ext", "png")
+                        if ext.lower() in ("png", ".png"):
+                            mime_type = "image/png"
+                        elif ext.lower() in ("jpg", "jpeg", ".jpg", ".jpeg"):
+                            mime_type = "image/jpeg"
+                        elif ext.lower() in ("gif", ".gif"):
+                            mime_type = "image/gif"
+                        else:
+                            mime_type = "image/png"
+                        return {
+                            "data": b64_data,
+                            "base64": b64_data,
+                            "content_type": mime_type,
+                            "slide_number": slide_num
+                        }
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from picture shape: {e}")
+            
+            return None
+        except Exception as e:
+            self._log(f"Slide {slide_num}: Error in _extract_image_from_shape: {e}")
+            return None
+
+    def _extract_images_recursive(self, shapes, slide_num: int) -> List[Dict[str, Any]]:
+        """Recursively extract images from shapes, including grouped shapes."""
+        images = []
+        
+        for shape in shapes:
+            # Try to extract image from this shape
+            img = self._extract_image_from_shape(shape, slide_num)
+            if img:
+                images.append(img)
+                self._log(f"Slide {slide_num}: Extracted image ({len(img['base64']) * 3 // 4} bytes, {img['content_type']})")
+            
+            # If shape is a group, recursively extract from its shapes
+            if hasattr(shape, "shapes"):
+                try:
+                    nested_images = self._extract_images_recursive(shape.shapes, slide_num)
+                    images.extend(nested_images)
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from grouped shape: {e}")
+        
+        return images
+
     def extract_pptx_fallback(self, file_path: str, file_name: str) -> Optional[Dict[str, Any]]:
         """
         Fallback extraction using python-pptx when LibreOffice conversion fails.
         Extracts both text and images, returning data in the same format as the converter service.
+        Enhanced to extract images from grouped shapes, backgrounds, and all shape types.
         """
         try:
             from pptx import Presentation
@@ -239,37 +320,43 @@ class Filter:
                         text = shape.text.strip()
                         if text:
                             slide_data["text"].append(text)
-                    
-                    # Extract images
-                    if hasattr(shape, "image"):
-                        try:
-                            image = shape.image
-                            image_bytes = image.blob
-                            
-                            # Convert to base64
-                            b64_data = base64.b64encode(image_bytes).decode("utf-8")
-                            
-                            # Determine mime type from image extension
-                            ext = image.ext
-                            if ext.lower() in ("png", ".png"):
-                                mime_type = "image/png"
-                            elif ext.lower() in ("jpg", "jpeg", ".jpg", ".jpeg"):
-                                mime_type = "image/jpeg"
-                            elif ext.lower() in ("gif", ".gif"):
-                                mime_type = "image/gif"
-                            else:
-                                mime_type = "image/png"  # Default
-                            
-                            slide_data["images"].append({
-                                "data": b64_data,
-                                "base64": b64_data,
-                                "content_type": mime_type,
-                                "slide_number": idx
-                            })
-                            total_images += 1
-                            self._log(f"Slide {idx}: Extracted image ({len(image_bytes)} bytes, {mime_type})")
-                        except Exception as img_e:
-                            self._log(f"Slide {idx}: Failed to extract image: {img_e}")
+                
+                # Extract images recursively (handles grouped shapes)
+                slide_images = self._extract_images_recursive(slide.shapes, idx)
+                slide_data["images"].extend(slide_images)
+                total_images += len(slide_images)
+                
+                # Try to extract background image if present
+                try:
+                    if hasattr(slide, "background") and slide.background:
+                        bg = slide.background
+                        if hasattr(bg, "fill") and hasattr(bg.fill, "picture"):
+                            pic = bg.fill.picture
+                            if hasattr(pic, "image"):
+                                bg_image = pic.image
+                                bg_bytes = bg_image.blob
+                                bg_b64 = base64.b64encode(bg_bytes).decode("utf-8")
+                                ext = bg_image.ext
+                                if ext.lower() in ("png", ".png"):
+                                    bg_mime = "image/png"
+                                elif ext.lower() in ("jpg", "jpeg", ".jpg", ".jpeg"):
+                                    bg_mime = "image/jpeg"
+                                elif ext.lower() in ("gif", ".gif"):
+                                    bg_mime = "image/gif"
+                                else:
+                                    bg_mime = "image/png"
+                                
+                                slide_data["images"].append({
+                                    "data": bg_b64,
+                                    "base64": bg_b64,
+                                    "content_type": bg_mime,
+                                    "slide_number": idx
+                                })
+                                total_images += 1
+                                self._log(f"Slide {idx}: Extracted background image ({len(bg_bytes)} bytes, {bg_mime})")
+                except Exception as bg_e:
+                    # Background extraction is optional, don't fail if it doesn't work
+                    pass
                 
                 # Extract notes
                 if slide.has_notes_slide and slide.notes_slide.notes_text_frame:

@@ -213,6 +213,65 @@ def _extract_docx_text(path: str) -> str:
         return ""
 
 
+def _extract_docx_images(path: str) -> List[Dict[str, str]]:
+    """Extract images from DOCX file and return as base64 data URLs."""
+    images = []
+    try:
+        from docx import Document  # type: ignore
+        import zipfile
+    except Exception as e:
+        log(f"DOCX image extraction import failed: {e}")
+        return images
+    
+    try:
+        # DOCX files are ZIP archives - extract images from word/media/
+        with zipfile.ZipFile(path, 'r') as docx_zip:
+            # List all files in the archive
+            file_list = docx_zip.namelist()
+            
+            # Find all image files in word/media/
+            image_files = [f for f in file_list if f.startswith('word/media/') and 
+                          any(f.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])]
+            
+            for img_path in image_files:
+                try:
+                    # Read image data
+                    img_data = docx_zip.read(img_path)
+                    
+                    # Determine MIME type from extension
+                    ext = img_path.lower()
+                    if ext.endswith('.png'):
+                        mime_type = 'image/png'
+                    elif ext.endswith(('.jpg', '.jpeg')):
+                        mime_type = 'image/jpeg'
+                    elif ext.endswith('.gif'):
+                        mime_type = 'image/gif'
+                    elif ext.endswith('.bmp'):
+                        mime_type = 'image/bmp'
+                    elif ext.endswith('.webp'):
+                        mime_type = 'image/webp'
+                    else:
+                        mime_type = 'image/png'  # Default
+                    
+                    # Convert to base64
+                    b64_data = base64.b64encode(img_data).decode('utf-8')
+                    
+                    images.append({
+                        "url": f"data:{mime_type};base64,{b64_data}",
+                        "name": os.path.basename(img_path),
+                        "mime_type": mime_type
+                    })
+                    log(f"Extracted image from DOCX: {os.path.basename(img_path)} ({len(img_data)} bytes)")
+                except Exception as img_e:
+                    log(f"Failed to extract image {img_path} from DOCX: {img_e}")
+        
+        log(f"Extracted {len(images)} images from DOCX file")
+    except Exception as e:
+        log(f"DOCX image extraction failed: {e}")
+    
+    return images
+
+
 def _extract_csv_text(path: str) -> str:
     try:
         rows = []
@@ -256,6 +315,65 @@ def _extract_xlsx_text(path: str) -> str:
     except Exception as e:
         log(f"XLSX parse failed: {e}")
         return ""
+
+
+def _extract_xlsx_images(path: str) -> List[Dict[str, str]]:
+    """Extract images from XLSX file and return as base64 data URLs."""
+    images = []
+    try:
+        import openpyxl  # type: ignore
+        import zipfile
+    except Exception as e:
+        log(f"XLSX image extraction import failed: {e}")
+        return images
+    
+    try:
+        # XLSX files are ZIP archives - extract images from xl/media/
+        with zipfile.ZipFile(path, 'r') as xlsx_zip:
+            # List all files in the archive
+            file_list = xlsx_zip.namelist()
+            
+            # Find all image files in xl/media/
+            image_files = [f for f in file_list if f.startswith('xl/media/') and 
+                          any(f.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])]
+            
+            for img_path in image_files:
+                try:
+                    # Read image data
+                    img_data = xlsx_zip.read(img_path)
+                    
+                    # Determine MIME type from extension
+                    ext = img_path.lower()
+                    if ext.endswith('.png'):
+                        mime_type = 'image/png'
+                    elif ext.endswith(('.jpg', '.jpeg')):
+                        mime_type = 'image/jpeg'
+                    elif ext.endswith('.gif'):
+                        mime_type = 'image/gif'
+                    elif ext.endswith('.bmp'):
+                        mime_type = 'image/bmp'
+                    elif ext.endswith('.webp'):
+                        mime_type = 'image/webp'
+                    else:
+                        mime_type = 'image/png'  # Default
+                    
+                    # Convert to base64
+                    b64_data = base64.b64encode(img_data).decode('utf-8')
+                    
+                    images.append({
+                        "url": f"data:{mime_type};base64,{b64_data}",
+                        "name": os.path.basename(img_path),
+                        "mime_type": mime_type
+                    })
+                    log(f"Extracted image from XLSX: {os.path.basename(img_path)} ({len(img_data)} bytes)")
+                except Exception as img_e:
+                    log(f"Failed to extract image {img_path} from XLSX: {img_e}")
+        
+        log(f"Extracted {len(images)} images from XLSX file")
+    except Exception as e:
+        log(f"XLSX image extraction failed: {e}")
+    
+    return images
 
 
 def _extract_doc_text(path: str) -> str:
@@ -699,12 +817,25 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
 
         # Text-first ingestion for DOCX/CSV/XLSX/others
         text_block = ""
+        docx_images = []
+        xlsx_images = []
+        
         if _is_docx(name, mime):
             text_block = _extract_docx_text(path)
+            # Also extract images from DOCX
+            docx_images = _extract_docx_images(path)
+            if docx_images:
+                images.extend(docx_images)
+                log(f"Added {len(docx_images)} images from DOCX file: {name}")
         elif _is_csv(name, mime):
             text_block = _extract_csv_text(path)
         elif _is_xlsx(name, mime):
             text_block = _extract_xlsx_text(path)
+            # Also extract images from XLSX
+            xlsx_images = _extract_xlsx_images(path)
+            if xlsx_images:
+                images.extend(xlsx_images)
+                log(f"Added {len(xlsx_images)} images from XLSX file: {name}")
         elif _is_tsv(name, mime):
             text_block = _extract_tsv_text(path)
         elif _is_md(name, mime) or _is_txt(name, mime):
@@ -753,12 +884,25 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
         log(f"Adding PDF: {pdf['filename']}")
     
     # Add images if any
+    image_count = 0
+    total_image_size = 0
     if images:
         for img in images:
-            content_items.append({
-                "type": "input_image",
-                "image_url": img.get("url", ""),
-            })
+            img_url = img.get("url", "")
+            if img_url:
+                # Calculate approximate size of base64 image
+                if img_url.startswith("data:"):
+                    try:
+                        b64_part = img_url.split(",", 1)[1] if "," in img_url else ""
+                        total_image_size += len(b64_part)
+                    except:
+                        pass
+                content_items.append({
+                    "type": "input_image",
+                    "image_url": img_url,
+                })
+                image_count += 1
+        log(f"Prepared {image_count} images for API (total size: {total_image_size/1024:.1f}KB)")
 
     # Add extracted text blocks (DOCX/CSV/XLSX)
     if texts:
@@ -789,7 +933,11 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
         }]
     }
     
+    # Log what we're sending
+    payload_size = len(json.dumps(payload))
     log(f"Calling Responses API with model: {model}")
+    log(f"Payload: {len(pdfs)} PDFs, {image_count} images, {len(texts)} text blocks")
+    log(f"Payload size: {payload_size/1024:.1f}KB")
     
     async with httpx.AsyncClient(timeout=300.0) as client:
         resp = await _post_with_retry(
@@ -804,10 +952,49 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
             base_delay=1.0,
             stream=False,
         )
+        
+        # Verify response
         if resp.status_code >= 400:
-            log(f"Responses API error: {resp.status_code} - {resp.text}")
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        return resp.json()
+            error_text = resp.text[:500] if hasattr(resp, 'text') else str(resp)
+            log(f"❌ Responses API ERROR: HTTP {resp.status_code}")
+            log(f"Error details: {error_text}")
+            METRICS["errors_total"] += 1
+            METRICS["last_error"] = f"HTTP {resp.status_code}: {error_text[:200]}"
+            raise HTTPException(status_code=resp.status_code, detail=error_text)
+        
+        # Success - parse and validate response
+        try:
+            response_data = resp.json()
+            
+            # Verify response structure
+            if not isinstance(response_data, dict):
+                log(f"⚠️ WARNING: Unexpected response type: {type(response_data)}")
+            else:
+                # Check for output in response (indicates successful processing)
+                output = response_data.get("output", [])
+                has_output = len(output) > 0
+                
+                # Check usage stats (indicates API processed the request)
+                usage = response_data.get("usage", {})
+                has_usage = bool(usage)
+                
+                if has_output or has_usage:
+                    log(f"✅ SUCCESS: OpenAI received and processed the request")
+                    log(f"   - Response ID: {response_data.get('id', 'N/A')}")
+                    log(f"   - Output items: {len(output)}")
+                    log(f"   - Usage stats: {bool(usage)}")
+                    if image_count > 0:
+                        log(f"   - Images sent: {image_count} (verified in payload)")
+                else:
+                    log(f"⚠️ WARNING: Response received but no output/usage data found")
+            
+            return response_data
+        except json.JSONDecodeError as e:
+            log(f"❌ ERROR: Failed to parse JSON response: {e}")
+            log(f"Response text (first 500 chars): {resp.text[:500] if hasattr(resp, 'text') else 'N/A'}")
+            METRICS["errors_total"] += 1
+            METRICS["last_error"] = f"JSON parse error: {str(e)}"
+            raise HTTPException(status_code=502, detail="Invalid JSON response from OpenAI")
 
 
 async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], images: list[dict] = None, texts: list[str] = None):
@@ -826,12 +1013,17 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
         })
         log(f"Adding PDF: {pdf['filename']}")
     
+    image_count = 0
     if images:
         for img in images:
-            content_items.append({
-                "type": "input_image",
-                "image_url": img.get("url", ""),
-            })
+            img_url = img.get("url", "")
+            if img_url:
+                content_items.append({
+                    "type": "input_image",
+                    "image_url": img_url,
+                })
+                image_count += 1
+        log(f"Streaming: Prepared {image_count} images for API")
 
     if texts:
         for t in texts:
@@ -877,11 +1069,21 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
                     if resp.status_code >= 400:
                         if resp.status_code in (429, 500, 502, 503, 504) and attempt < attempts:
                             delay = base_delay * (2 ** (attempt - 1))
-                            log(f"Responses stream error {resp.status_code}, retrying in {delay:.1f}s ({attempt}/{attempts})")
+                            log(f"❌ Responses stream error {resp.status_code}, retrying in {delay:.1f}s ({attempt}/{attempts})")
                             await asyncio.sleep(delay)
                             continue
                         text = await resp.aread()
-                        raise HTTPException(status_code=resp.status_code, detail=text.decode() if hasattr(text, "decode") else str(text))
+                        error_msg = text.decode() if hasattr(text, "decode") else str(text)
+                        log(f"❌ Responses stream ERROR: HTTP {resp.status_code} - {error_msg[:200]}")
+                        METRICS["errors_total"] += 1
+                        METRICS["last_error"] = f"Stream HTTP {resp.status_code}: {error_msg[:200]}"
+                        raise HTTPException(status_code=resp.status_code, detail=error_msg)
+                    
+                    # Success - log that stream started
+                    if image_count > 0:
+                        log(f"✅ Streaming started: {image_count} images sent, waiting for response chunks...")
+                    else:
+                        log(f"✅ Streaming started: waiting for response chunks...")
 
                     async for line in resp.aiter_lines():
                         if not line:
@@ -910,6 +1112,7 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
                             }
                             yield f"data: {json.dumps(chunk)}\n\n"
                     # If stream completed without [DONE], send a terminator
+                    log(f"✅ Stream completed successfully")
                     yield "data: [DONE]\n\n"
                     return
         except Exception as e:
