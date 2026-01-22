@@ -284,6 +284,122 @@ class Filter:
         
         return images
 
+    def _extract_text_from_shape(self, shape, slide_num: int) -> List[str]:
+        """Comprehensively extract ALL text from a shape, including tables, placeholders, etc."""
+        texts = []
+        
+        try:
+            # Method 1: Direct text attribute (most common)
+            if hasattr(shape, "text") and shape.text:
+                text = str(shape.text).strip()
+                if text:
+                    texts.append(text)
+            
+            # Method 2: Extract from text_frame (for text boxes, placeholders, etc.)
+            if hasattr(shape, "text_frame"):
+                try:
+                    text_frame = shape.text_frame
+                    # Extract from all paragraphs
+                    if hasattr(text_frame, "paragraphs"):
+                        for para in text_frame.paragraphs:
+                            para_text = ""
+                            # Extract from all runs in paragraph
+                            if hasattr(para, "runs"):
+                                for run in para.runs:
+                                    if hasattr(run, "text") and run.text:
+                                        para_text += run.text
+                            # If no runs, try direct paragraph text
+                            if not para_text and hasattr(para, "text"):
+                                para_text = para.text
+                            
+                            if para_text.strip():
+                                texts.append(para_text.strip())
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from text_frame: {e}")
+            
+            # Method 3: Extract from table cells
+            if hasattr(shape, "table"):
+                try:
+                    table = shape.table
+                    table_rows = []
+                    for row in table.rows:
+                        row_cells = []
+                        for cell in row.cells:
+                            cell_text = ""
+                            # Extract text from cell's text_frame
+                            if hasattr(cell, "text_frame") and cell.text_frame:
+                                if hasattr(cell.text_frame, "paragraphs"):
+                                    for para in cell.text_frame.paragraphs:
+                                        if hasattr(para, "runs"):
+                                            for run in para.runs:
+                                                if hasattr(run, "text") and run.text:
+                                                    cell_text += run.text
+                                        elif hasattr(para, "text"):
+                                            cell_text += para.text
+                                elif hasattr(cell.text_frame, "text"):
+                                    cell_text = cell.text_frame.text
+                            # Fallback to cell.text
+                            if not cell_text and hasattr(cell, "text"):
+                                cell_text = cell.text
+                            
+                            row_cells.append(cell_text.strip() if cell_text else "")
+                        if any(row_cells):  # Only add non-empty rows
+                            table_rows.append(row_cells)
+                    
+                    if table_rows:
+                        # Format table as text
+                        table_text = "Table:\n"
+                        for row in table_rows:
+                            table_text += " | ".join(str(cell) for cell in row) + "\n"
+                        texts.append(table_text.strip())
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from table: {e}")
+            
+            # Method 4: Extract from placeholders
+            if hasattr(shape, "is_placeholder") and shape.is_placeholder:
+                try:
+                    if hasattr(shape, "text"):
+                        placeholder_text = str(shape.text).strip()
+                        if placeholder_text:
+                            texts.append(placeholder_text)
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from placeholder: {e}")
+            
+            # Method 5: Extract from auto-shape text
+            if hasattr(shape, "auto_shape_type"):
+                try:
+                    if hasattr(shape, "text"):
+                        auto_text = str(shape.text).strip()
+                        if auto_text:
+                            texts.append(auto_text)
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting from auto-shape: {e}")
+            
+        except Exception as e:
+            self._log(f"Slide {slide_num}: Error in _extract_text_from_shape: {e}")
+        
+        return texts
+
+    def _extract_text_recursive(self, shapes, slide_num: int) -> List[str]:
+        """Recursively extract ALL text from shapes, including grouped shapes."""
+        all_texts = []
+        
+        for shape in shapes:
+            # Extract text from this shape
+            shape_texts = self._extract_text_from_shape(shape, slide_num)
+            if shape_texts:
+                all_texts.extend(shape_texts)
+            
+            # If shape is a group, recursively extract from its shapes
+            if hasattr(shape, "shapes"):
+                try:
+                    nested_texts = self._extract_text_recursive(shape.shapes, slide_num)
+                    all_texts.extend(nested_texts)
+                except Exception as e:
+                    self._log(f"Slide {slide_num}: Error extracting text from grouped shape: {e}")
+        
+        return all_texts
+
     def extract_pptx_fallback(self, file_path: str, file_name: str) -> Optional[Dict[str, Any]]:
         """
         Fallback extraction using python-pptx when LibreOffice conversion fails.
@@ -308,18 +424,54 @@ class Filter:
                     "images": []
                 }
                 
-                # Extract title
+                # Extract title (comprehensive)
                 if slide.shapes.title:
-                    title = slide.shapes.title.text.strip()
-                    if title:
-                        slide_data["title"] = title
+                    title_texts = self._extract_text_from_shape(slide.shapes.title, idx)
+                    if title_texts:
+                        slide_data["title"] = " ".join(title_texts).strip()
                 
-                # Extract text from all shapes
+                # Extract ALL text from all shapes using comprehensive method
+                all_slide_texts = self._extract_text_recursive(slide.shapes, idx)
+                if all_slide_texts:
+                    # Deduplicate while preserving order
+                    seen = set()
+                    for text in all_slide_texts:
+                        text_clean = text.strip()
+                        if text_clean and text_clean not in seen:
+                            seen.add(text_clean)
+                            slide_data["text"].append(text_clean)
+                
+                # Also extract tables separately for better formatting
                 for shape in slide.shapes:
-                    if hasattr(shape, "text") and shape.text.strip():
-                        text = shape.text.strip()
-                        if text:
-                            slide_data["text"].append(text)
+                    if hasattr(shape, "table"):
+                        try:
+                            table = shape.table
+                            table_data = []
+                            for row in table.rows:
+                                row_data = []
+                                for cell in row.cells:
+                                    cell_text = ""
+                                    if hasattr(cell, "text_frame") and cell.text_frame:
+                                        if hasattr(cell.text_frame, "paragraphs"):
+                                            for para in cell.text_frame.paragraphs:
+                                                if hasattr(para, "runs"):
+                                                    for run in para.runs:
+                                                        if hasattr(run, "text") and run.text:
+                                                            cell_text += run.text
+                                                elif hasattr(para, "text"):
+                                                    cell_text += para.text
+                                        elif hasattr(cell.text_frame, "text"):
+                                            cell_text = cell.text_frame.text
+                                    if not cell_text and hasattr(cell, "text"):
+                                        cell_text = cell.text
+                                    row_data.append(cell_text.strip() if cell_text else "")
+                                if any(row_data):
+                                    table_data.append(row_data)
+                            
+                            if table_data:
+                                slide_data.setdefault("tables", []).append(table_data)
+                        except Exception as e:
+                            self._log(f"Slide {idx}: Error extracting table: {e}")
                 
                 # Extract images recursively (handles grouped shapes)
                 slide_images = self._extract_images_recursive(slide.shapes, idx)
@@ -358,22 +510,66 @@ class Filter:
                     # Background extraction is optional, don't fail if it doesn't work
                     pass
                 
-                # Extract notes
-                if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-                    notes = slide.notes_slide.notes_text_frame.text.strip()
-                    if notes:
-                        slide_data["notes"] = notes
+                # Extract notes comprehensively
+                try:
+                    if slide.has_notes_slide:
+                        notes_slide = slide.notes_slide
+                        notes_text = ""
+                        
+                        # Extract from notes_text_frame
+                        if hasattr(notes_slide, "notes_text_frame") and notes_slide.notes_text_frame:
+                            if hasattr(notes_slide.notes_text_frame, "paragraphs"):
+                                for para in notes_slide.notes_text_frame.paragraphs:
+                                    if hasattr(para, "runs"):
+                                        for run in para.runs:
+                                            if hasattr(run, "text") and run.text:
+                                                notes_text += run.text
+                                    elif hasattr(para, "text"):
+                                        notes_text += para.text
+                            elif hasattr(notes_slide.notes_text_frame, "text"):
+                                notes_text = notes_slide.notes_text_frame.text
+                        
+                        # Also check for shapes in notes slide
+                        if hasattr(notes_slide, "shapes"):
+                            notes_shape_texts = self._extract_text_recursive(notes_slide.shapes, idx)
+                            if notes_shape_texts:
+                                notes_text += "\n" + "\n".join(notes_shape_texts)
+                        
+                        notes_text = notes_text.strip()
+                        if notes_text:
+                            slide_data["notes"] = notes_text
+                            self._log(f"Slide {idx}: Extracted notes ({len(notes_text)} chars)")
+                except Exception as notes_e:
+                    self._log(f"Slide {idx}: Error extracting notes: {notes_e}")
                 
                 slides_data.append(slide_data)
+            
+            # Calculate extraction statistics
+            total_text_chars = 0
+            total_tables = 0
+            slides_with_content = 0
+            
+            for slide_data in slides_data:
+                slide_text_count = sum(len(str(t)) for t in slide_data.get("text", []))
+                total_text_chars += slide_text_count
+                total_text_chars += len(slide_data.get("title", ""))
+                total_text_chars += len(slide_data.get("notes", ""))
+                total_tables += len(slide_data.get("tables", []))
+                if slide_text_count > 0 or slide_data.get("title") or slide_data.get("notes"):
+                    slides_with_content += 1
             
             result = {
                 "slides": slides_data,
                 "fallback_mode": True,
                 "total_slides": len(slides_data),
-                "total_images": total_images
+                "total_images": total_images,
+                "total_text_chars": total_text_chars,
+                "total_tables": total_tables,
+                "slides_with_content": slides_with_content
             }
             
-            self._log(f"Fallback extraction successful: {len(slides_data)} slides, {total_images} images")
+            self._log(f"Fallback extraction successful: {len(slides_data)} slides, {total_images} images, {total_text_chars} text chars, {total_tables} tables")
+            self._log(f"Content coverage: {slides_with_content}/{len(slides_data)} slides have content ({100*slides_with_content/len(slides_data) if slides_data else 0:.1f}%)")
             return result
             
         except ImportError:
@@ -423,16 +619,19 @@ class Filter:
             if notes:
                 slide_text.append(f"(Note: {notes})")
             
-            # Add tables as formatted text
+            # Add tables as formatted text (comprehensive)
             tables = slide.get("tables", [])
-            for table in tables:
+            for table_idx, table in enumerate(tables):
                 if isinstance(table, list):
                     table_text = []
                     for row in table:
                         if isinstance(row, list):
-                            table_text.append(" | ".join(str(cell) for cell in row))
+                            # Clean cell values and join
+                            clean_row = [str(cell).strip() if cell else "" for cell in row]
+                            if any(clean_row):  # Only add non-empty rows
+                                table_text.append(" | ".join(clean_row))
                     if table_text:
-                        slide_text.append("\n".join(table_text))
+                        slide_text.append(f"Table {table_idx + 1}:\n" + "\n".join(table_text))
             
             # Add image references for source view
             if include_image_refs:
