@@ -761,7 +761,39 @@ class Filter:
         # Build content blocks - interleave text and images so they appear together in source view
         content_blocks = [{"type": "text", "text": combined_text}]
         # Add images (no extra metadata - OpenWebUI doesn't allow unexpected keys)
-        content_blocks.extend(all_images)
+        # Clean each image dict to ensure only expected keys are present
+        cleaned_images = []
+        for idx, img in enumerate(all_images):
+            if isinstance(img, dict) and img.get("type") == "image_url":
+                # Extract URL from image_url dict or string
+                img_url_obj = img.get("image_url", {})
+                if isinstance(img_url_obj, dict):
+                    url = img_url_obj.get("url", "")
+                elif isinstance(img_url_obj, str):
+                    url = img_url_obj
+                else:
+                    url = ""
+                
+                # Create clean dict with only expected keys (type and image_url with url)
+                if url:
+                    clean_img = {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": url
+                        }
+                    }
+                    cleaned_images.append(clean_img)
+                    # Log first image structure for debugging
+                    if idx == 0:
+                        self._log(f"Sample cleaned image keys: {list(clean_img.keys())}, image_url keys: {list(clean_img['image_url'].keys())}")
+                else:
+                    self._log(f"WARNING: Image {idx} has no URL")
+            else:
+                # If it's not in the expected format, skip it
+                self._log(f"WARNING: Skipping invalid image format at index {idx}: {type(img)}, keys: {list(img.keys()) if isinstance(img, dict) else 'N/A'}")
+        
+        self._log(f"Cleaned {len(cleaned_images)} images (from {len(all_images)} total)")
+        content_blocks.extend(cleaned_images)
         
         messages[-1]["content"] = content_blocks
         body["messages"] = messages
