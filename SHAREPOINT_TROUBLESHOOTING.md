@@ -1,5 +1,17 @@
 # SharePoint Integration - Troubleshooting Guide
 
+## ⚠️ IMPORTANT: No Function Registration Needed!
+
+**The SharePoint Import is a FILTER (not a Function):**
+- ✅ **Auto-loads** - No manual registration required
+- ✅ **Already in Dockerfile** - Copied to filter directories automatically
+- ✅ **Check logs** - Look for `[SHAREPOINT-IMPORT] SharePoint import filter initialized`
+- ❌ **Do NOT** try to manually add it as a function
+
+**Filters vs Functions:**
+- **Filters** (like SharePoint Import) = Auto-load, no registration needed
+- **Functions/Pipes** = Need to be registered in Admin UI
+
 ## Common Issues and Fixes
 
 ### Issue 1: "SharePoint integration not enabled" or "Can't browse SharePoint"

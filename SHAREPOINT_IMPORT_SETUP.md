@@ -47,6 +47,19 @@ SHAREPOINT_TENANT_ID=your_tenant_id
    - Directory (tenant) ID
    - Client secret value
 
+## ⚠️ IMPORTANT: No Function Registration Needed!
+
+**The SharePoint Import is a FILTER, not a Function:**
+- ✅ **Auto-loads** from `/app/backend/filters/` directory
+- ✅ **No manual registration** required
+- ✅ **Already configured** in Dockerfile
+- ❌ **Do NOT** try to add it as a function in Admin UI
+
+**How to Verify It's Loaded:**
+1. Check Render logs for: `[SHAREPOINT-IMPORT] SharePoint import filter initialized`
+2. If you see this message, the filter is loaded and working
+3. You can configure it in **Admin → Functions** (it will appear there), but it auto-loads regardless
+
 ## Usage
 
 ### Option 1: Visual Browser (Recommended) 🌟
