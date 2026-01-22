@@ -2181,19 +2181,51 @@ async def sharepoint_browser_page():
 async def list_sharepoint_files_api():
     """API endpoint to list SharePoint files."""
     try:
+        # Check environment variables first
+        client_id = os.environ.get("SHAREPOINT_CLIENT_ID", "")
+        client_secret = os.environ.get("SHAREPOINT_CLIENT_SECRET", "")
+        tenant_id = os.environ.get("SHAREPOINT_TENANT_ID", "")
+        site_url = os.environ.get("SHAREPOINT_SITE_URL", "")
+        enable_sp = os.environ.get("ENABLE_SHAREPOINT", "false").lower() == "true"
+        
+        if not enable_sp:
+            raise HTTPException(
+                status_code=403, 
+                detail="SharePoint integration is disabled. Set ENABLE_SHAREPOINT=true in environment variables."
+            )
+        
+        if not all([client_id, client_secret, tenant_id, site_url]):
+            missing = []
+            if not client_id: missing.append("SHAREPOINT_CLIENT_ID")
+            if not client_secret: missing.append("SHAREPOINT_CLIENT_SECRET")
+            if not tenant_id: missing.append("SHAREPOINT_TENANT_ID")
+            if not site_url: missing.append("SHAREPOINT_SITE_URL")
+            
+            raise HTTPException(
+                status_code=400,
+                detail=f"SharePoint configuration incomplete. Missing: {', '.join(missing)}. Please set these environment variables in Render."
+            )
+        
         # Import the filter to use its methods
         from sharepoint_import_filter import Filter
         filter_instance = Filter()
         
         if not filter_instance.valves.enable_sharepoint:
-            raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
+            raise HTTPException(status_code=403, detail="SharePoint integration not enabled in filter")
         
         files = filter_instance._list_sharepoint_files()
         
+        if files is None:
+            raise HTTPException(status_code=500, detail="Failed to retrieve files. Check SharePoint credentials and permissions.")
+        
         return JSONResponse(content={"files": files})
+    except HTTPException:
+        raise
     except Exception as e:
         log(f"Failed to list SharePoint files: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        log(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"SharePoint error: {str(e)}")
 
 
 @app.get("/api/v1/sharepoint/search")
