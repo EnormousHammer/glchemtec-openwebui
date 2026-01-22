@@ -1,0 +1,104 @@
+lchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="143.105.15.78" requestID="f2eed44a-4be9-43c2" responseTimeMS=6 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/new clientIP="143.105.15.78" requestID="a7a0cda8-27a9-4bc2" responseTimeMS=18 responseBytes=1037 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.78" requestID="839aa7f7-1038-4799" responseTimeMS=8 responseBytes=1582 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/31c7d00d-a194-43a5-a1ec-256a6374eded clientIP="143.105.15.78" requestID="ed44de73-bb7e-4777" responseTimeMS=15 responseBytes=1139 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-22 00:20:37.121 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "POST /api/v1/chats/new HTTP/1.1" 200
+2026-01-22 00:20:37.184 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "GET /api/v1/tools/ HTTP/1.1" 200
+2026-01-22 00:20:37.324 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-22 00:20:37.517 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "POST /api/v1/chats/31c7d00d-a194-43a5-a1ec-256a6374eded HTTP/1.1" 200
+2026-01-22 00:20:37.661 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+[PPT-PDF-VISION] ============================================================
+[PPT-PDF-VISION] INLET - PPT/PDF Vision Filter v8.0
+[PPT-PDF-VISION] Converter URL: https://glc-pptx-converter.onrender.com
+[PPT-PDF-VISION] Body keys: ['stream', 'model', 'messages', 'files', 'features', 'stream_options', 'metadata']
+[PPT-PDF-VISION] Found 1 files in body['files']
+[PPT-PDF-VISION] Total unique files found: 1
+[PPT-PDF-VISION] Model: gl---ai-agent-prompt-v1, Format: OpenAI
+[PPT-PDF-VISION] Processing file: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] File path: /app/backend/data/uploads/7052f8ba-67c8-40b2-907f-b287487e85eb_GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] Processing PPTX via external converter service
+[PPT-PDF-VISION] Sending PPTX to converter: https://glc-pptx-converter.onrender.com/api/extract/pptx
+[PPT-PDF-VISION] File: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx, Size: 3528192 bytes
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.78" requestID="23a44646-edc7-483f" responseTimeMS=7 responseBytes=1582 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[PPT-PDF-VISION] PPTX extraction failed: HTTP 500
+[PPT-PDF-VISION] Full error response (416 chars): {"diagnostics":{"libraries_available":{"markitdown":true,"openpyxl":true,"python_pptx":true},"pdf_conversion_time":"8.10s"},"error":"LibreOffice conversion failed: convert /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx as a Impress document -> /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pdf using filter : impress_pdf_Export\n","success":false}
+[PPT-PDF-VISION] Error message: LibreOffice conversion failed: convert /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx as a Impress document -> /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pdf using filter : impress_pdf_Export
+[PPT-PDF-VISION] Diagnostics: {
+  "libraries_available": {
+    "markitdown": true,
+    "openpyxl": true,
+    "python_pptx": true
+  },
+  "pdf_conversion_time": "8.10s"
+}
+[PPT-PDF-VISION] === LIBREOFFICE CONVERSION ERROR DETECTED ===
+[PPT-PDF-VISION] Full error: LibreOffice conversion failed: convert /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx as a Impress document -> /tmp/tmpln4dykth/glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pdf using filter : impress_pdf_Export
+[PPT-PDF-VISION]   libraries_available: {'markitdown': True, 'openpyxl': True, 'python_pptx': True}
+[PPT-PDF-VISION]   pdf_conversion_time: 8.10s
+[PPT-PDF-VISION] PPTX extraction failed - attempting fallback extraction
+[PPT-PDF-VISION] Attempting fallback extraction using python-pptx for glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] Slide 1: Extracted image (74986 bytes, image/jpeg)
+[PPT-PDF-VISION] Slide 1: Extracted image (42111 bytes, image/png)
+[PPT-PDF-VISION] Slide 1: Extracted image (54916 bytes, image/png)
+[PPT-PDF-VISION] Slide 4: Extracted image (45036 bytes, image/png)
+[PPT-PDF-VISION] Slide 5: Extracted image (51937 bytes, image/png)
+[PPT-PDF-VISION] Slide 7: Extracted image (81620 bytes, image/png)
+[PPT-PDF-VISION] Slide 7: Extracted image (75681 bytes, image/png)
+[PPT-PDF-VISION] Slide 8: Extracted image (79499 bytes, image/png)
+[PPT-PDF-VISION] Slide 10: Extracted image (85565 bytes, image/png)
+[PPT-PDF-VISION] Slide 10: Extracted image (40445 bytes, image/png)
+[PPT-PDF-VISION] Slide 12: Extracted image (70988 bytes, image/png)
+[PPT-PDF-VISION] Slide 12: Extracted image (77658 bytes, image/png)
+[PPT-PDF-VISION] Slide 14: Extracted image (70988 bytes, image/png)
+[PPT-PDF-VISION] Slide 15: Extracted image (86544 bytes, image/png)
+[PPT-PDF-VISION] Slide 17: Extracted image (81074 bytes, image/png)
+[PPT-PDF-VISION] Slide 17: Extracted image (35529 bytes, image/png)
+[PPT-PDF-VISION] Slide 21: Extracted image (117024 bytes, image/png)
+[PPT-PDF-VISION] Fallback extraction successful: 22 slides, 17 images
+[PPT-PDF-VISION] Added fallback text (3195 chars)
+[PPT-PDF-VISION] Slide 1: Using embedded base64 image
+[PPT-PDF-VISION] Slide 1: Using embedded base64 image
+[PPT-PDF-VISION] Slide 1: Using embedded base64 image
+[PPT-PDF-VISION] Slide 4: Using embedded base64 image
+[PPT-PDF-VISION] Slide 5: Using embedded base64 image
+[PPT-PDF-VISION] Slide 7: Using embedded base64 image
+[PPT-PDF-VISION] Slide 7: Using embedded base64 image
+[PPT-PDF-VISION] Slide 8: Using embedded base64 image
+[PPT-PDF-VISION] Slide 10: Using embedded base64 image
+[PPT-PDF-VISION] Slide 10: Using embedded base64 image
+[PPT-PDF-VISION] Slide 12: Using embedded base64 image
+[PPT-PDF-VISION] Slide 12: Using embedded base64 image
+[PPT-PDF-VISION] Slide 14: Using embedded base64 image
+[PPT-PDF-VISION] Slide 15: Using embedded base64 image
+[PPT-PDF-VISION] Slide 17: Using embedded base64 image
+[PPT-PDF-VISION] Slide 17: Using embedded base64 image
+[PPT-PDF-VISION] Slide 21: Using embedded base64 image
+[PPT-PDF-VISION] Total images prepared: 17, size: 1525KB
+[PPT-PDF-VISION] Added 17 images from fallback extraction
+[PPT-PDF-VISION] Building message with 1 text sections, 17 images
+[PPT-PDF-VISION] SUCCESS - Message updated with extracted content
+[PPT-PDF-VISION] ============================================================
+[EXPORT-FILTER] Inlet called
+2026-01-22 00:20:46.271 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-22 00:20:46.272 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "POST /api/chat/completions HTTP/1.1" 200
+[POST]
+glchemtec-openwebui.onrender.com/api/chat/completions clientIP="143.105.15.78" requestID="2849d103-7fd2-4219" responseTimeMS=8453 responseBytes=398 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-22 00:20:46.436 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.78:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.78" requestID="17efa8d7-4a6d-49b8" responseTimeMS=8 responseBytes=1582 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+
+Batches:   0%|          | 0/3 [00:00<?, ?it/s]
+Batches:  33%|███▎      | 1/3 [00:00<00:00,  3.94it/s]
+Batches:  67%|██████▋   | 2/3 [00:00<00:00,  3.58it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00,  5.02it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00,  4.58it/s]
+2026-01-22 00:20:49.898 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['2e8eb9c0-e39b-4a72-959a-b3fe1bc895f4', '4d8327c7-a87b-44ce-89b2-0c1a6e3794d1', '9dfb48cf-e100-4dea-b1ad-33b19ab52d32']] [[{'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 0, 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'created_by': '2d462341-231d-4710-945f-af92b457e405', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 2514, 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 1594}]]
+2026-01-22 00:20:49.902 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['2e8eb9c0-e39b-4a72-959a-b3fe1bc895f4', '4d8327c7-a87b-44ce-89b2-0c1a6e3794d1', '9dfb48cf-e100-4dea-b1ad-33b19ab52d32']] [[{'start_index': 0, 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb'}, {'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'start_index': 2514}, {'start_index': 1594, 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}]]
+2026-01-22 00:20:49.903 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['4d8327c7-a87b-44ce-89b2-0c1a6e3794d1', 'be2b9d4e-1acd-4e8d-9b30-1c30f3edc82a', '7155aaeb-445c-4b21-9689-e3e5e97758f3']] [[{'start_index': 2514, 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'start_index': 3260}, {'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': '7052f8ba-67c8-40b2-907f-b287487e85eb', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 681}]]
+2026-01-22 00:20:49.917 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.78" requestID="530cd4aa-705b-4bfa" responseTimeMS=4 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"

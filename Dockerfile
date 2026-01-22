@@ -48,6 +48,8 @@ COPY ppt_pdf_vision_filter.py /app/backend/filters/ppt_pdf_vision_filter.py
 COPY ppt_pdf_vision_filter.py /app/backend/custom/filters/ppt_pdf_vision_filter.py
 COPY export_filter.py /app/backend/filters/export_filter.py
 COPY export_filter.py /app/backend/custom/filters/export_filter.py
+COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
+COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY start.sh /app/start.sh
 
 # Create directories with proper permissions for NLTK and other data

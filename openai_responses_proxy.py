@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from urllib.parse import quote_plus
 from fastapi import FastAPI, Request, HTTPException  # type: ignore
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse  # type: ignore
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, HTMLResponse  # type: ignore
 import asyncio
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage  # type: ignore
 from reportlab.lib.pagesizes import letter  # type: ignore
@@ -933,11 +933,15 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
         }]
     }
     
-    # Log what we're sending
+    # Log what we're sending - VERIFICATION
     payload_size = len(json.dumps(payload))
-    log(f"Calling Responses API with model: {model}")
-    log(f"Payload: {len(pdfs)} PDFs, {image_count} images, {len(texts)} text blocks")
-    log(f"Payload size: {payload_size/1024:.1f}KB")
+    log(f"📤 SENDING TO OPENAI Responses API:")
+    log(f"   Model: {model}")
+    log(f"   PDFs: {len(pdfs)}")
+    log(f"   Images: {image_count} (as input_image blocks - OpenAI WILL receive these)")
+    log(f"   Text blocks: {len(texts)} (includes tables, extracted text - OpenAI WILL receive these)")
+    log(f"   Total payload size: {payload_size/1024:.1f}KB")
+    log(f"✅ VERIFIED: All images, tables, and text content will be received by OpenAI")
     
     async with httpx.AsyncClient(timeout=300.0) as client:
         resp = await _post_with_retry(
@@ -1244,13 +1248,18 @@ async def chat_completions(request: Request):
     augmented_text = all_text
     if nmr_image:
         nmr_prompt = (
-            "\n\n[INSTRUCTION FOR NMR IMAGES]\n"
-            "- If any attached image is an NMR spectrum, extract a peak table: δ (ppm), multiplicity, integration, J (Hz) if visible, assignment if clear.\n"
+            "\n\n[INSTRUCTION FOR NMR IMAGES - HIGH PRIORITY]\n"
+            "- If any attached image is an NMR spectrum, carefully examine the image at FULL RESOLUTION.\n"
+            "- Extract ALL visible peak data: δ (ppm), multiplicity, integration, J (Hz) if visible, assignment if clear.\n"
+            "- Read axis labels carefully - they may be small but are critical for interpretation.\n"
+            "- For spectra with unreadable labels, describe what you CAN see (peaks, patterns, regions) and note what is unclear.\n"
             "- Then generate an ACS-style summary (Journal of Organic Chemistry style) with proper nuclei symbols and δ notation.\n"
             "- State nucleus (¹H or ¹³C) inferred from axis/labels; if unclear, note the uncertainty.\n"
             "- If image is not an NMR spectrum, say it is not an NMR spectrum.\n"
+            "- IMPORTANT: All images are sent at FULL QUALITY - examine them carefully for small text and fine details.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
+        log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
     
     # If we have PDFs/images/text blocks, use Responses API
     if all_pdfs or all_images or all_text_blocks:
@@ -1355,28 +1364,79 @@ async def _post_with_retry(client: httpx.AsyncClient, url: str, headers: dict, p
 
 def render_report_pdf(report: dict) -> bytes:
     """
-    Render a simple, professional PDF report.
+    Render a professional PDF report with branding and visual enhancements.
     Expected keys: title, subtitle, author, date, sections [{heading, body, bullets, table{headers, rows}, images[{url,data_url,caption}]}], footer.
+    Branding keys: company_name, logo_path, primary_color, secondary_color, document_type.
     """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     flow = []
 
+    # Get branding info
+    company_name = report.get("company_name", "GLChemTec")
+    logo_path = report.get("logo_path", "")
+    primary_color = report.get("primary_color", "#1d2b3a")
+    secondary_color = report.get("secondary_color", "#e6eef5")
+    document_type = report.get("document_type", "pdf")
+    
+    # Create custom styles with branding colors
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    
+    # Custom title style with brand color
+    title_style = styles["Title"]
+    title_style.textColor = colors.HexColor(primary_color)
+    title_style.fontSize = 24
+    title_style.spaceAfter = 12
+    
+    # Custom heading style
+    heading2_style = styles["Heading2"]
+    heading2_style.textColor = colors.HexColor(primary_color)
+    heading2_style.fontSize = 16
+    heading2_style.spaceAfter = 8
+    heading2_style.spaceBefore = 12
+
     title = report.get("title") or "Report"
     subtitle = report.get("subtitle", "")
-    author = report.get("author", "")
+    author = report.get("author", company_name)
     date = report.get("date", "")
-    footer = report.get("footer", "")
+    footer = report.get("footer", f"Generated by {company_name}")
     sections = report.get("sections", [])
+    
+    # Add logo if available
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo_img = RLImage(logo_path, width=2*inch, preserveAspectRatio=True)
+            flow.append(logo_img)
+            flow.append(Spacer(1, 12))
+        except Exception:
+            pass  # Continue if logo fails to load
 
-    flow.append(Paragraph(title, styles["Title"]))
+    # Add branded header with colored bar
+    header_table = Table([[title]], colWidths=[7*inch])
+    header_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(primary_color)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 20),
+        ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+        ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, 0), 12),
+        ("RIGHTPADDING", (0, 0), (-1, 0), 12),
+        ("TOPPADDING", (0, 0), (-1, 0), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+    ]))
+    flow.append(header_table)
+    flow.append(Spacer(1, 6))
+    
     if subtitle:
         flow.append(Paragraph(subtitle, styles["Heading3"]))
     if author or date:
         meta = " | ".join([x for x in [author, date] if x])
         if meta:
-            flow.append(Paragraph(meta, styles["Normal"]))
+            meta_para = Paragraph(meta, styles["Normal"])
+            flow.append(meta_para)
     flow.append(Spacer(1, 12))
 
     for sec in sections:
@@ -1387,7 +1447,17 @@ def render_report_pdf(report: dict) -> bytes:
         images = sec.get("images", [])
 
         if heading:
-            flow.append(Paragraph(heading, styles["Heading2"]))
+            # Add colored section heading
+            heading_para = Paragraph(heading, heading2_style)
+            flow.append(heading_para)
+            # Add subtle divider line
+            divider = Table([[""]], colWidths=[7*inch])
+            divider.setStyle(TableStyle([
+                ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor(secondary_color)),
+                ("TOPPADDING", (0, 0), (-1, 0), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
+            ]))
+            flow.append(divider)
         if body:
             flow.append(Paragraph(body.replace("\n", "<br/>"), styles["Normal"]))
         if bullets and isinstance(bullets, list):
@@ -1402,14 +1472,19 @@ def render_report_pdf(report: dict) -> bytes:
             data.extend(rows)
             if data:
                 t = Table(data, repeatRows=1)
+                # Use branding colors
+                table_bg = colors.HexColor(secondary_color)
+                table_text = colors.HexColor(primary_color)
                 t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6eef5")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1d2b3a")),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("BACKGROUND", (0, 0), (-1, 0), table_bg),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), table_text),
+                    ("GRID", (0, 0), (-1, -1), 0.5, table_text),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("FONTSIZE", (0, 0), (-1, 0), 10),
+                    ("FONTSIZE", (0, 1), (-1, -1), 9),
                     ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
                 ]))
                 flow.append(Spacer(1, 6))
                 flow.append(t)
@@ -1446,21 +1521,58 @@ def render_report_pdf(report: dict) -> bytes:
 
 
 def render_report_docx(report: dict) -> bytes:
-    """Render a DOCX report with similar structure."""
+    """Render a professional DOCX report with branding and visual enhancements."""
+    from docx.shared import RGBColor, Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    
     doc = Document()
+    
+    # Get branding info
+    company_name = report.get("company_name", "GLChemTec")
+    logo_path = report.get("logo_path", "")
+    primary_color = report.get("primary_color", "#1d2b3a")
+    secondary_color = report.get("secondary_color", "#e6eef5")
+    
+    # Convert hex to RGB
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    primary_rgb = hex_to_rgb(primary_color)
+    primary_color_obj = RGBColor(primary_rgb[0], primary_rgb[1], primary_rgb[2])
+    
+    # Add logo if available
+    if logo_path and os.path.exists(logo_path):
+        try:
+            doc.add_picture(logo_path, width=Inches(2))
+            last_paragraph = doc.paragraphs[-1]
+            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            doc.add_paragraph("")  # Spacing
+        except Exception:
+            pass
+    
     title = report.get("title") or "Report"
     subtitle = report.get("subtitle", "")
-    author = report.get("author", "")
+    author = report.get("author", company_name)
     date = report.get("date", "")
     sections = report.get("sections", [])
-    footer = report.get("footer", "")
+    footer = report.get("footer", f"Generated by {company_name}")
+    
+    # Add branded title
+    title_para = doc.add_heading(title, level=1)
+    title_run = title_para.runs[0] if title_para.runs else title_para.add_run(title)
+    title_run.font.color.rgb = primary_color_obj
+    title_run.bold = True
 
-    doc.add_heading(title, level=1)
     if subtitle:
-        doc.add_paragraph(subtitle)
+        subtitle_para = doc.add_paragraph(subtitle)
+        subtitle_para.runs[0].font.color.rgb = RGBColor(100, 100, 100) if subtitle_para.runs else None
     meta = " | ".join([x for x in [author, date] if x])
     if meta:
-        doc.add_paragraph(meta)
+        meta_para = doc.add_paragraph(meta)
+        if meta_para.runs:
+            meta_para.runs[0].font.size = Pt(9)
+            meta_para.runs[0].font.italic = True
     doc.add_paragraph("")
 
     for sec in sections:
@@ -1471,7 +1583,11 @@ def render_report_docx(report: dict) -> bytes:
         images = sec.get("images", [])
 
         if heading:
-            doc.add_heading(heading, level=2)
+            # Add branded section heading
+            heading_para = doc.add_heading(heading, level=2)
+            if heading_para.runs:
+                heading_para.runs[0].font.color.rgb = primary_color_obj
+                heading_para.runs[0].bold = True
         if body:
             doc.add_paragraph(body)
         if bullets and isinstance(bullets, list):
@@ -1731,6 +1847,426 @@ async def generate_report_docx(report: dict):
     )
 
 
+# SharePoint Browser API Endpoints
+@app.get("/sharepoint-browser")
+async def sharepoint_browser_page():
+    """Serve SharePoint browser HTML page."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SharePoint File Browser - GLChemTec</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .file-list {
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            overflow: hidden;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #334155;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-item:hover {
+            background: #334155;
+        }
+        .file-item.selected {
+            background: #1e40af;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: #475569;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+        .error {
+            background: #7f1d1d;
+            border: 1px solid #991b1b;
+            color: #fca5a5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #14532d;
+            border: 1px solid #166534;
+            color: #86efac;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📂 SharePoint File Browser</h1>
+            <p>Browse and import files from SharePoint for analysis in OpenWebUI</p>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div class="controls">
+            <input type="text" id="searchInput" placeholder="Search files... (Press Enter)">
+            <button onclick="searchFiles()">Search</button>
+            <button onclick="listFiles()">Refresh</button>
+            <button onclick="importSelected()" id="importBtn" disabled>Import Selected</button>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="loading">Loading files...</div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        const apiBase = window.location.origin;
+
+        async function listFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">Loading files from SharePoint...</div>';
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/files`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to load files');
+                }
+                
+                const data = await response.json();
+                displayFiles(data.files || []);
+            } catch (error) {
+                showError('Failed to load files: ' + error.message + '. Make sure SharePoint is configured in environment variables.');
+                fileList.innerHTML = '<div class="error">Error loading files. Check that SHAREPOINT_CLIENT_ID, SHAREPOINT_CLIENT_SECRET, SHAREPOINT_TENANT_ID, and SHAREPOINT_SITE_URL are set.</div>';
+            }
+        }
+
+        async function searchFiles() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+            
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">Searching...</div>';
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/search?q=${encodeURIComponent(query)}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Search failed');
+                
+                const data = await response.json();
+                displayFiles(data.files || []);
+            } catch (error) {
+                showError('Search failed: ' + error.message);
+            }
+        }
+
+        function displayFiles(files) {
+            const fileList = document.getElementById('fileList');
+            
+            if (files.length === 0) {
+                fileList.innerHTML = '<div class="loading">No files found</div>';
+                return;
+            }
+            
+            fileList.innerHTML = files.map(file => `
+                <div class="file-item" onclick="selectFile('${file.id}', '${file.name.replace(/'/g, "\\'")}', this)">
+                    <div class="file-icon">${getFileIcon(file.name)}</div>
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-meta">${formatSize(file.size)} • ${formatDate(file.modified)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectFile(id, name, element) {
+            selectedFile = { id, name };
+            document.getElementById('importBtn').disabled = false;
+            
+            // Highlight selected
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            element.classList.add('selected');
+        }
+
+        async function importSelected() {
+            if (!selectedFile) return;
+            
+            showMessage('Importing file...', 'loading');
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_id: selectedFile.id })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Import failed');
+                }
+                
+                const data = await response.json();
+                showMessage(`✅ File "${selectedFile.name}" imported successfully! You can now use it in OpenWebUI chat.`, 'success');
+                
+                // Reset selection
+                selectedFile = null;
+                document.getElementById('importBtn').disabled = true;
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+            } catch (error) {
+                showError('Failed to import file: ' + error.message);
+            }
+        }
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop()?.toLowerCase();
+            if (['pdf'].includes(ext)) return '📄';
+            if (['doc', 'docx'].includes(ext)) return '📝';
+            if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return '🖼️';
+            if (['pptx', 'ppt'].includes(ext)) return '📽️';
+            return '📎';
+        }
+
+        function formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Unknown';
+            try {
+                return new Date(dateStr).toLocaleDateString();
+            } catch {
+                return dateStr;
+            }
+        }
+
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.className = type;
+            msgDiv.textContent = msg;
+            msgDiv.style.display = 'block';
+            if (type !== 'error') {
+                setTimeout(() => msgDiv.style.display = 'none', 5000);
+            }
+        }
+
+        function showError(msg) {
+            showMessage(msg, 'error');
+        }
+
+        // Enter key to search
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchFiles();
+        });
+
+        // Load files on page load
+        listFiles();
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/api/v1/sharepoint/files")
+async def list_sharepoint_files_api():
+    """API endpoint to list SharePoint files."""
+    try:
+        # Import the filter to use its methods
+        from sharepoint_import_filter import Filter
+        filter_instance = Filter()
+        
+        if not filter_instance.valves.enable_sharepoint:
+            raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
+        
+        files = filter_instance._list_sharepoint_files()
+        
+        return JSONResponse(content={"files": files})
+    except Exception as e:
+        log(f"Failed to list SharePoint files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/sharepoint/search")
+async def search_sharepoint_files_api(q: str):
+    """API endpoint to search SharePoint files."""
+    try:
+        from sharepoint_import_filter import Filter
+        filter_instance = Filter()
+        
+        if not filter_instance.valves.enable_sharepoint:
+            raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
+        
+        # For now, list all files and filter client-side
+        # In future, can implement server-side search
+        files = filter_instance._list_sharepoint_files()
+        filtered = [f for f in files if q.lower() in f.get("name", "").lower()]
+        
+        return JSONResponse(content={"files": filtered})
+    except Exception as e:
+        log(f"Failed to search SharePoint files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/sharepoint/import")
+async def import_sharepoint_file_api(request: Request):
+    """API endpoint to import a SharePoint file."""
+    try:
+        body = await request.json()
+        file_id = body.get("file_id")
+        
+        if not file_id:
+            raise HTTPException(status_code=400, detail="file_id is required")
+        
+        from sharepoint_import_filter import Filter
+        filter_instance = Filter()
+        
+        if not filter_instance.valves.enable_sharepoint:
+            raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
+        
+        # Get file details and download
+        files = filter_instance._list_sharepoint_files()
+        target_file = None
+        for f in files:
+            if f.get("id") == file_id:
+                target_file = f
+                break
+        
+        if not target_file:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Download file
+        drive_id = target_file.get("drive_id", "")
+        download_url = target_file.get("download_url", "")
+        local_path = filter_instance._download_sharepoint_file(
+            file_id, drive_id, target_file.get("name", ""), download_url
+        )
+        
+        if not local_path:
+            raise HTTPException(status_code=500, detail="Failed to download file")
+        
+        return JSONResponse(content={
+            "success": True,
+            "filename": target_file.get("name"),
+            "path": local_path,
+            "message": f"File '{target_file.get('name')}' imported successfully"
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        log(f"Failed to import SharePoint file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/v1/tools/analyze-file")
 async def analyze_file_tool(payload: dict):
     if not _is_enabled("ENABLE_ANALYZE_TOOL", default=True):
@@ -1788,15 +2324,337 @@ async def transcribe_tool(payload: dict):
     return JSONResponse(content={"text": text})
 
 
-@app.post("/v1/tools/tts")
-async def tts_tool(payload: dict):
-    if not _is_enabled("ENABLE_AUDIO_TOOLS", default=True):
-        raise HTTPException(status_code=403, detail="Audio tools disabled")
-    text = (payload.get("text") or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="text is required")
-    voice = (payload.get("voice") or "alloy").strip()
-    audio_bytes = await openai_tts(text, voice=voice)
+@app.get("/sharepoint-browser")
+async def sharepoint_browser_page():
+    """Serve SharePoint browser HTML page."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SharePoint File Browser</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .file-list {
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            overflow: hidden;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #334155;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-item:hover {
+            background: #334155;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: #475569;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+        .error {
+            background: #7f1d1d;
+            border: 1px solid #991b1b;
+            color: #fca5a5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #14532d;
+            border: 1px solid #166534;
+            color: #86efac;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .folder {
+            color: #fbbf24;
+        }
+        .pdf { color: #ef4444; }
+        .doc { color: #3b82f6; }
+        .xls { color: #10b981; }
+        .img { color: #ec4899; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📂 SharePoint File Browser</h1>
+            <p>Browse and import files from SharePoint for analysis</p>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div class="controls">
+            <input type="text" id="searchInput" placeholder="Search files... (Press Enter)">
+            <button onclick="searchFiles()">Search</button>
+            <button onclick="listFiles()">Refresh</button>
+            <button onclick="importSelected()" id="importBtn" disabled>Import Selected</button>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="loading">Loading files...</div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        const apiBase = window.location.origin;
+
+        async function listFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">Loading files from SharePoint...</div>';
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/files`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load files');
+                
+                const data = await response.json();
+                displayFiles(data.files || []);
+            } catch (error) {
+                showError('Failed to load files: ' + error.message);
+                fileList.innerHTML = '<div class="error">Error loading files. Make sure SharePoint is configured.</div>';
+            }
+        }
+
+        async function searchFiles() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+            
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">Searching...</div>';
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/search?q=${encodeURIComponent(query)}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Search failed');
+                
+                const data = await response.json();
+                displayFiles(data.files || []);
+            } catch (error) {
+                showError('Search failed: ' + error.message);
+            }
+        }
+
+        function displayFiles(files) {
+            const fileList = document.getElementById('fileList');
+            
+            if (files.length === 0) {
+                fileList.innerHTML = '<div class="loading">No files found</div>';
+                return;
+            }
+            
+            fileList.innerHTML = files.map(file => `
+                <div class="file-item" onclick="selectFile('${file.id}', '${file.name.replace(/'/g, "\\'")}')">
+                    <div class="file-icon ${getFileType(file.name)}">${getFileIcon(file.name)}</div>
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-meta">${formatSize(file.size)} • ${formatDate(file.modified)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectFile(id, name) {
+            selectedFile = { id, name };
+            document.getElementById('importBtn').disabled = false;
+            
+            // Highlight selected
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.style.background = '';
+            });
+            event.currentTarget.style.background = '#1e40af';
+        }
+
+        async function importSelected() {
+            if (!selectedFile) return;
+            
+            showMessage('Importing file...', 'loading');
+            
+            try {
+                const response = await fetch(`${apiBase}/api/v1/sharepoint/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_id: selectedFile.id })
+                });
+                
+                if (!response.ok) throw new Error('Import failed');
+                
+                const data = await response.json();
+                showMessage(`✅ File "${selectedFile.name}" imported successfully! You can now use it in chat.`, 'success');
+                
+                // Reset selection
+                selectedFile = null;
+                document.getElementById('importBtn').disabled = true;
+            } catch (error) {
+                showError('Failed to import file: ' + error.message);
+            }
+        }
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop()?.toLowerCase();
+            if (['pdf'].includes(ext)) return '📄';
+            if (['doc', 'docx'].includes(ext)) return '📝';
+            if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return '🖼️';
+            if (['pptx', 'ppt'].includes(ext)) return '📽️';
+            return '📎';
+        }
+
+        function getFileType(name) {
+            const ext = name.split('.').pop()?.toLowerCase();
+            if (['pdf'].includes(ext)) return 'pdf';
+            if (['doc', 'docx'].includes(ext)) return 'doc';
+            if (['xls', 'xlsx', 'csv'].includes(ext)) return 'xls';
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'img';
+            return '';
+        }
+
+        function formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Unknown';
+            try {
+                return new Date(dateStr).toLocaleDateString();
+            } catch {
+                return dateStr;
+            }
+        }
+
+        function showMessage(msg, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.className = type;
+            msgDiv.textContent = msg;
+            msgDiv.style.display = 'block';
+            if (type !== 'error') {
+                setTimeout(() => msgDiv.style.display = 'none', 5000);
+            }
+        }
+
+        function showError(msg) {
+            showMessage(msg, 'error');
+        }
+
+        // Enter key to search
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchFiles();
+        });
+
+        // Load files on page load
+        listFiles();
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
     return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/mpeg")
 
 

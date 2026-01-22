@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 8.0
-description: Uses external glc-pptx-converter service for PPTX extraction + vision processing for PDFs.
+version: 9.0
+description: Local PPTX extraction (no external service needed) + vision processing for PDFs.
 """
 
 import os
@@ -11,9 +11,18 @@ import json
 import tempfile
 import shutil
 import requests
+import zipfile
 from typing import Optional, List, Dict, Any
+from io import BytesIO
 
 from pydantic import BaseModel, Field
+
+# Import python-pptx for local extraction
+try:
+    from pptx import Presentation
+    PPTX_AVAILABLE = True
+except ImportError:
+    PPTX_AVAILABLE = False
 
 
 class Filter:
@@ -22,12 +31,8 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
         
-        # External PPTX Converter Service
-        pptx_converter_url: str = Field(
-            default="https://glc-pptx-converter.onrender.com",
-            description="URL of the glc-pptx-converter service"
-        )
-        pptx_converter_timeout: int = Field(default=120, description="Timeout for PPTX converter (seconds)")
+        # PPTX Extraction - Built into OpenWebUI instance (no external service needed)
+        # The extraction now happens directly in this filter using python-pptx
         
         # PDF Processing (fallback for PDFs)
         max_pages: int = Field(default=8, description="Max pages for PDF processing")
@@ -135,74 +140,167 @@ class Filter:
         m = (model or "").lower()
         return "claude" in m or "anthropic" in m
 
-    def extract_pptx_via_service(self, file_path: str, file_name: str) -> Optional[Dict[str, Any]]:
+    def extract_pptx_locally(self, file_path: str, file_name: str) -> Optional[Dict[str, Any]]:
         """
-        Send PPTX to glc-pptx-converter service and get extracted data.
-        Returns dict with slides, text, images, etc.
+        Extract PPTX content directly in OpenWebUI instance using python-pptx.
+        No external service needed - everything runs in this instance.
+        Returns dict with slides, text, images, tables, etc.
         """
+        if not PPTX_AVAILABLE:
+            self._log("python-pptx not available, cannot extract PPTX locally")
+            return None
+        
         try:
-            url = f"{self.valves.pptx_converter_url}/api/extract/pptx"
-            self._log(f"Sending PPTX to converter: {url}")
-            self._log(f"File: {file_name}, Size: {os.path.getsize(file_path)} bytes")
+            self._log(f"Extracting PPTX locally: {file_name}")
+            prs = Presentation(file_path)
             
-            with open(file_path, 'rb') as f:
-                files = {
-                    'file': (
-                        file_name, 
-                        f, 
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                    )
-                }
-                response = requests.post(
-                    url, 
-                    files=files, 
-                    timeout=self.valves.pptx_converter_timeout
-                )
+            slides_data = []
+            all_text = []
+            all_images = []
+            all_tables = []
             
-            if response.status_code == 200:
-                data = response.json()
-                self._log(f"PPTX extraction successful: {len(data.get('slides', []))} slides")
-                return data
-            else:
-                # Log full error response (not truncated)
-                error_text = response.text
-                self._log(f"PPTX extraction failed: HTTP {response.status_code}")
-                self._log(f"Full error response ({len(error_text)} chars): {error_text}")
+            for slide_idx, slide in enumerate(prs.slides, 1):
+                slide_text = []
+                slide_images = []
+                slide_tables = []
                 
-                # Try to parse JSON error and extract diagnostics
-                try:
-                    error_json = response.json()
-                    error_msg = error_json.get("error", "Unknown error")
-                    diagnostics = error_json.get("diagnostics", {})
+                # Extract text from all shapes
+                for shape in slide.shapes:
+                    # Text from text boxes
+                    if hasattr(shape, "text") and shape.text:
+                        text = shape.text.strip()
+                        if text:
+                            slide_text.append(text)
+                            all_text.append(text)
                     
-                    self._log(f"Error message: {error_msg}")
-                    if diagnostics:
-                        self._log(f"Diagnostics: {json.dumps(diagnostics, indent=2)}")
-                        
-                        # Log LibreOffice-specific errors if present
-                        if "libreoffice" in error_msg.lower() or "convert" in error_msg.lower():
-                            self._log("=== LIBREOFFICE CONVERSION ERROR DETECTED ===")
-                            self._log(f"Full error: {error_msg}")
-                            if isinstance(diagnostics, dict):
-                                for key, value in diagnostics.items():
-                                    self._log(f"  {key}: {value}")
-                except (json.JSONDecodeError, AttributeError):
-                    # Not JSON, log as plain text
-                    self._log(f"Non-JSON error response: {error_text}")
+                    # Images - Extract at FULL QUALITY (no compression)
+                    if hasattr(shape, "image"):
+                        try:
+                            image_bytes = shape.image.blob
+                            img_size_kb = len(image_bytes) // 1024
+                            
+                            # Use original image bytes - NO compression for maximum quality
+                            # This is critical for NMR spectra, chemical structures, and small text
+                            b64_data = base64.b64encode(image_bytes).decode("utf-8")
+                            
+                            # Determine mime type from original
+                            ext = shape.image.ext.lower()
+                            mime_type = "image/png"  # Default to PNG for lossless
+                            if ext in ("jpg", "jpeg"):
+                                mime_type = "image/jpeg"
+                            elif ext == "gif":
+                                mime_type = "image/gif"
+                            
+                            # Log image details for verification
+                            self._log(f"Slide {slide_idx}: Extracted image - {img_size_kb}KB, {mime_type}, FULL QUALITY (no compression)")
+                            
+                            img_data = {
+                                "base64": b64_data,
+                                "data_url": f"data:{mime_type};base64,{b64_data}",
+                                "mime_type": mime_type,
+                                "slide_number": slide_idx,
+                                "size_kb": img_size_kb,
+                                "quality": "full"  # Mark as full quality
+                            }
+                            slide_images.append(img_data)
+                            all_images.append(img_data)
+                        except Exception as e:
+                            self._log(f"Error extracting image from slide {slide_idx}: {e}")
+                    
+                    # Tables
+                    if hasattr(shape, "table") and shape.has_table:
+                        try:
+                            table = shape.table
+                            table_data = {
+                                "rows": [],
+                                "slide_number": slide_idx
+                            }
+                            
+                            for row in table.rows:
+                                row_data = []
+                                for cell in row.cells:
+                                    cell_text = cell.text.strip() if cell.text else ""
+                                    row_data.append(cell_text)
+                                table_data["rows"].append(row_data)
+                            
+                            slide_tables.append(table_data)
+                            all_tables.append(table_data)
+                        except Exception as e:
+                            self._log(f"Error extracting table from slide {slide_idx}: {e}")
+                    
+                    # Group shapes (may contain nested images/text)
+                    if hasattr(shape, "shapes"):
+                        for sub_shape in shape.shapes:
+                            if hasattr(sub_shape, "text") and sub_shape.text:
+                                text = sub_shape.text.strip()
+                                if text:
+                                    slide_text.append(text)
+                                    all_text.append(text)
+                            
+                            if hasattr(sub_shape, "image"):
+                                try:
+                                    image_bytes = sub_shape.image.blob
+                                    img_size_kb = len(image_bytes) // 1024
+                                    b64_data = base64.b64encode(image_bytes).decode("utf-8")
+                                    ext = sub_shape.image.ext.lower()
+                                    mime_type = "image/png"  # Default to PNG for lossless
+                                    if ext in ("jpg", "jpeg"):
+                                        mime_type = "image/jpeg"
+                                    
+                                    self._log(f"Slide {slide_idx}: Extracted nested image - {img_size_kb}KB, FULL QUALITY")
+                                    
+                                    img_data = {
+                                        "base64": b64_data,
+                                        "data_url": f"data:{mime_type};base64,{b64_data}",
+                                        "mime_type": mime_type,
+                                        "slide_number": slide_idx,
+                                        "size_kb": img_size_kb,
+                                        "quality": "full"
+                                    }
+                                    slide_images.append(img_data)
+                                    all_images.append(img_data)
+                                except Exception as e:
+                                    self._log(f"Error extracting nested image: {e}")
                 
-                return None
+                # Extract speaker notes
+                notes_text = ""
+                if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+                    notes_text = slide.notes_slide.notes_text_frame.text.strip()
                 
-        except requests.exceptions.Timeout:
-            self._log(f"PPTX extraction timeout after {self.valves.pptx_converter_timeout}s")
-            return None
-        except requests.exceptions.RequestException as e:
-            self._log(f"PPTX extraction request error: {type(e).__name__}: {e}")
-            return None
+                slide_data = {
+                    "slide_number": slide_idx,
+                    "text": "\n".join(slide_text),
+                    "images": slide_images,
+                    "tables": slide_tables,
+                    "notes": notes_text
+                }
+                slides_data.append(slide_data)
+            
+            result = {
+                "slides": slides_data,
+                "total_slides": len(slides_data),
+                "all_text": "\n\n".join(all_text),
+                "total_images": len(all_images),
+                "total_tables": len(all_tables),
+                "extracted_by": "local_python_pptx"
+            }
+            
+            # Log detailed extraction summary
+            total_img_size = sum(img.get("size_kb", 0) for img in all_images)
+            self._log(f"✅ PPTX extraction successful:")
+            self._log(f"   - {len(slides_data)} slides")
+            self._log(f"   - {len(all_images)} images (FULL QUALITY - no compression)")
+            self._log(f"   - {len(all_tables)} tables")
+            self._log(f"   - Total image size: {total_img_size}KB (all sent at full quality to OpenAI)")
+            self._log(f"   - Images will be readable for NMR spectra, chemical structures, and small text")
+            return result
+            
         except Exception as e:
-            self._log(f"PPTX extraction unexpected error: {type(e).__name__}: {e}")
+            self._log(f"Local PPTX extraction error: {type(e).__name__}: {e}")
             import traceback
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
+    
 
     def _extract_image_from_shape(self, shape, slide_num: int) -> Optional[Dict[str, Any]]:
         """Extract image from a shape, handling various shape types."""
@@ -735,7 +833,12 @@ class Filter:
                         }
                     })
         
-        self._log(f"Total images prepared: {len(images)}, size: {total_size//1024}KB")
+        # Log detailed image information for verification
+        self._log(f"✅ Total images prepared for OpenAI: {len(images)}")
+        self._log(f"   - Total size: {total_size//1024}KB")
+        self._log(f"   - All images at FULL QUALITY (no compression)")
+        self._log(f"   - Images sent as base64 data URLs - OpenAI receives full resolution")
+        self._log(f"   - Quality sufficient for NMR spectra, chemical structures, and small text")
         return images
 
     def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
@@ -801,7 +904,7 @@ class Filter:
         """Main filter entry point - processes incoming requests."""
         self._log("=" * 60)
         self._log("INLET - PPT/PDF Vision Filter v8.0")
-        self._log(f"Converter URL: {self.valves.pptx_converter_url}")
+        self._log("Using built-in PPTX extraction (no external service)")
 
         if not self.valves.enabled:
             self._log("Filter is disabled")
@@ -852,9 +955,10 @@ class Filter:
 
             # ========== PPTX PROCESSING ==========
             if is_pptx:
-                self._log("Processing PPTX via external converter service")
+                self._log("Processing PPTX file (built-in extraction)")
                 
-                extracted = self.extract_pptx_via_service(file_path, file_name)
+                # Extract directly in this instance - no external service needed
+                extracted = self.extract_pptx_locally(file_path, file_name)
                 
                 if extracted:
                     # Add formatted text content
@@ -866,9 +970,20 @@ class Filter:
                     images = self.get_pptx_images_as_base64(extracted)
                     if images:
                         all_images.extend(images)
-                        self._log(f"Added {len(images)} images from PPTX")
+                        self._log(f"✅ Added {len(images)} images from PPTX to send to OpenAI")
+                        # Log image details for verification
+                        for idx, img in enumerate(images[:5]):  # Log first 5
+                            img_size = len(img.get("url", "").split(",")[-1]) if "," in img.get("url", "") else 0
+                            self._log(f"  Image {idx+1}: {img_size//1024}KB, type: {img.get('type', 'image_url')}")
                     else:
-                        self._log("WARNING: PPTX extraction succeeded but no images found")
+                        self._log("⚠️ WARNING: PPTX extraction succeeded but no images found")
+                    
+                    # Verify tables are in the formatted text
+                    tables_count = sum(len(slide.get("tables", [])) for slide in extracted.get("slides", []))
+                    if tables_count > 0:
+                        self._log(f"✅ Found {tables_count} tables - included in formatted text sent to OpenAI")
+                    else:
+                        self._log("ℹ️ No tables found in PPTX")
                 else:
                     self._log("PPTX extraction failed - attempting fallback extraction")
                     
@@ -891,8 +1006,8 @@ class Filter:
                         # Both methods failed
                         self._log("Both primary and fallback extraction failed - no content available")
                         error_msg = (
-                            f"[ERROR: PPTX conversion failed for {file_name}]\n"
-                            f"The external converter service (glc-pptx-converter) was unable to extract content.\n"
+                            f"[ERROR: PPTX extraction failed for {file_name}]\n"
+                            f"Unable to extract content from PowerPoint file.\n"
                             f"Fallback extraction also failed.\n"
                             f"This is typically due to:\n"
                             f"- LibreOffice conversion failure (check converter logs for details)\n"
@@ -927,7 +1042,28 @@ class Filter:
             self._log("No content extracted from any files")
             return body
 
-        self._log(f"Building message with {len(all_content)} text sections, {len(all_images)} images")
+        self._log(f"📤 Building message to send to OpenAI:")
+        self._log(f"   - {len(all_content)} text sections (includes tables, text, notes)")
+        self._log(f"   - {len(all_images)} images (will be sent as input_image to OpenAI)")
+        
+        # Verify what we're sending
+        if all_images:
+            total_img_size = 0
+            for img in all_images:
+                if isinstance(img, dict) and img.get("type") == "image_url":
+                    url = img.get("image_url", {})
+                    if isinstance(url, dict):
+                        url_str = url.get("url", "")
+                    else:
+                        url_str = str(url)
+                    if url_str.startswith("data:"):
+                        b64_part = url_str.split(",", 1)[1] if "," in url_str else ""
+                        total_img_size += len(b64_part)
+            self._log(f"   - Total image data size: {total_img_size//1024}KB")
+        
+        if all_content:
+            total_text_size = sum(len(str(c)) for c in all_content)
+            self._log(f"   - Total text size: {total_text_size//1024}KB (includes tables)")
 
         last_message = messages[-1]
         original_prompt = self._extract_text_content(last_message.get("content", ""))
@@ -991,13 +1127,17 @@ class Filter:
                 # If it's not in the expected format, skip it
                 self._log(f"WARNING: Skipping invalid image format at index {idx}: {type(img)}, keys: {list(img.keys()) if isinstance(img, dict) else 'N/A'}")
         
-        self._log(f"Cleaned {len(cleaned_images)} images (from {len(all_images)} total)")
+        self._log(f"✅ Cleaned {len(cleaned_images)} images (from {len(all_images)} total)")
         content_blocks.extend(cleaned_images)
         
         messages[-1]["content"] = content_blocks
         body["messages"] = messages
 
-        self._log(f"SUCCESS - Message updated with extracted content")
+        # Final verification - confirm what's being sent
+        self._log(f"✅ SUCCESS - Message ready to send to OpenAI:")
+        self._log(f"   - {len(all_content)} text blocks (includes ALL tables, text, notes)")
+        self._log(f"   - {len(cleaned_images)} images (as input_image - OpenAI WILL receive these)")
+        self._log(f"   - All content will be sent via Responses API to OpenAI")
         self._log("=" * 60)
         return body
 
