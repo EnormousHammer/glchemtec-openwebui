@@ -199,6 +199,8 @@ class Filter:
                     mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     file_size_kb = len(file_bytes) // 1024
                     
+                    # Store base64 data separately - don't put it in the instruction message
+                    b64_data = None
                     if len(file_bytes) < 5 * 1024 * 1024:  # Less than 5MB
                         b64_data = base64.b64encode(file_bytes).decode("utf-8")
                         download_url = f"data:{mime_type};base64,{b64_data}"
@@ -207,13 +209,13 @@ class Filter:
                         download_url = f"file://{file_path}"
                     
                     # Modify user message to include file info and instruction
-                    # This tells the assistant to provide a download link
+                    # This tells the assistant to provide a download link WITHOUT embedding the full base64
                     instruction = (
                         f"\n\n[SYSTEM NOTE: The user requested to export this conversation to {export_format.upper()}. "
                         f"The file has been generated: {filename} ({file_size_kb}KB). "
-                        f"Please inform the user that the file is ready and provide this download link: {download_url} "
-                        f"or mention that the file is saved at {file_path}. "
-                        f"Use markdown format for the link: [Download {filename}]({download_url})]"
+                        f"Please inform the user that the file is ready. "
+                        f"DO NOT include the full base64 data in your response - just mention the filename and that it's ready for download. "
+                        f"The file is saved at: {file_path}]"
                     )
                     
                     if isinstance(last_user_msg.get("content"), str):
@@ -229,6 +231,7 @@ class Filter:
                         last_user_msg["content"] = last_msg_content
                     
                     # Store file info in body metadata for outlet to use
+                    # Store base64 separately - don't pass it in instruction to assistant
                     if "metadata" not in body:
                         body["metadata"] = {}
                     if "export_file" not in body["metadata"]:
@@ -238,7 +241,8 @@ class Filter:
                         "filename": filename,
                         "format": export_format,
                         "size": len(file_bytes),
-                        "download_url": download_url
+                        "download_url": download_url,  # Store for outlet, but don't put in message
+                        "b64_data": b64_data  # Store separately (None for large files)
                     }
                     
                 except Exception as e:
@@ -324,7 +328,7 @@ class Filter:
             file_size = export_file_info.get("size", 0)
             download_url = export_file_info.get("download_url", "")
             
-            # If no download_url, create one
+            # If no download_url, create one (but don't embed full base64 in message)
             if not download_url and file_path and os.path.exists(file_path):
                 mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 if file_size < 5 * 1024 * 1024:  # Less than 5MB
@@ -344,23 +348,77 @@ class Filter:
             file_size_kb = file_size // 1024 if file_size else 0
             
             # Check if assistant already mentioned the file (from our inlet instruction)
-            if download_url and download_url not in content:
-                # Add download link if not already present
-                download_link = f"[📥 Download {filename}]({download_url})"
-                export_note = (
-                    f"\n\n---\n"
-                    f"📄 **Export File Ready**: {filename} ({file_size_kb}KB)\n"
-                    f"{download_link}\n"
-                )
+            # Only add a clean message, not the full base64 data
+            if download_url:
+                # Check if content already has a very long base64 string (indicates it was embedded)
+                has_long_base64 = len(content) > 10000 and "base64," in content
                 
-                if isinstance(last_msg.get("content"), str):
-                    last_msg["content"] = content + export_note
-                elif isinstance(last_msg.get("content"), list):
-                    last_msg["content"].append({
-                        "type": "text",
-                        "text": export_note
-                    })
-                
-                self._log(f"Enhanced assistant message with download link for {filename}")
+                if not has_long_base64:
+                    # Add a clean download message without embedding the full base64
+                    # For data URLs, we'll create a simple reference instead of the full URL
+                    if download_url.startswith("data:"):
+                        # Don't include the full base64 - just mention the file
+                        export_note = (
+                            f"\n\n---\n"
+                            f"📄 **Export File Ready**: {filename} ({file_size_kb}KB)\n"
+                            f"The {export_format.upper()} file has been generated and is ready for download.\n"
+                            f"File location: {file_path}\n"
+                        )
+                    else:
+                        # For file:// URLs, include the link
+                        export_note = (
+                            f"\n\n---\n"
+                            f"📄 **Export File Ready**: {filename} ({file_size_kb}KB)\n"
+                            f"File location: {file_path}\n"
+                        )
+                    
+                    if isinstance(last_msg.get("content"), str):
+                        # Remove any existing long base64 strings from content
+                        if has_long_base64:
+                            # Try to clean up the content by removing the base64 part
+                            import re
+                            content = re.sub(r'\(data:[^)]+base64,[^)]+\)', '', content)
+                            content = re.sub(r'data:[^;]+;base64,[^\s\)]+', '[PDF data]', content)
+                        last_msg["content"] = content + export_note
+                    elif isinstance(last_msg.get("content"), list):
+                        # Clean any text blocks that contain long base64
+                        cleaned_content = []
+                        for item in last_msg["content"]:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                text = item.get("text", "")
+                                # Remove long base64 strings
+                                if len(text) > 10000 and "base64," in text:
+                                    # Replace with a short message
+                                    item["text"] = f"PDF export is ready: {filename} ({file_size_kb}KB)"
+                            cleaned_content.append(item)
+                        last_msg["content"] = cleaned_content
+                        last_msg["content"].append({
+                            "type": "text",
+                            "text": export_note
+                        })
+                    
+                    self._log(f"Enhanced assistant message with clean download info for {filename}")
+                else:
+                    # Content already has base64 - try to clean it up
+                    self._log(f"Detected long base64 in content, attempting to clean it up")
+                    if isinstance(last_msg.get("content"), str):
+                        import re
+                        # Remove the base64 data URL but keep the filename reference
+                        content = re.sub(r'\(data:[^)]+base64,[^)]+\)', f'({filename})', content)
+                        content = re.sub(r'data:[^;]+;base64,[^\s\)]+', f'[Download {filename}]', content)
+                        # Add clean export note
+                        export_note = f"\n\n---\n📄 **Export File Ready**: {filename} ({file_size_kb}KB)\n"
+                        last_msg["content"] = content + export_note
+                    elif isinstance(last_msg.get("content"), list):
+                        # Clean up list content
+                        cleaned_content = []
+                        for item in last_msg["content"]:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                text = item.get("text", "")
+                                if len(text) > 10000 and "base64," in text:
+                                    # Replace with clean message
+                                    item["text"] = f"PDF export is ready: {filename} ({file_size_kb}KB). File saved at {file_path}"
+                            cleaned_content.append(item)
+                        last_msg["content"] = cleaned_content
 
         return body
