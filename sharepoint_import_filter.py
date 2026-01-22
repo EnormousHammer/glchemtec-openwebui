@@ -479,5 +479,84 @@ class Filter:
         return body
 
     def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
-        """Output filter - no changes needed."""
+        """Output filter - injects SharePoint browser iframe when user requests to browse."""
+        if not self.valves.enabled or not self.valves.enable_sharepoint:
+            return body
+        
+        messages = body.get("messages", [])
+        if not messages:
+            return body
+        
+        # Check if user requested to browse SharePoint
+        last_user_msg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                last_user_msg = msg
+                break
+        
+        if not last_user_msg:
+            return body
+        
+        user_text = ""
+        if isinstance(last_user_msg.get("content"), str):
+            user_text = last_user_msg.get("content", "")
+        elif isinstance(last_user_msg.get("content"), list):
+            for item in last_user_msg.get("content", []):
+                if isinstance(item, dict) and item.get("type") == "text":
+                    user_text += item.get("text", "") + " "
+        
+        # Check if user wants to browse (not download specific file)
+        browse_keywords = ["browse sharepoint", "show sharepoint files", "list sharepoint", "sharepoint browser", "open sharepoint", "import from sharepoint"]
+        wants_browse = any(keyword in user_text.lower() for keyword in browse_keywords)
+        
+        # Only show browser if no specific file was requested
+        has_specific_file = self._extract_filename_from_request(user_text) is not None
+        
+        if wants_browse and not has_specific_file:
+            # Get the proxy URL (where SharePoint browser is served)
+            # Use relative path - proxy should be on same domain
+            proxy_url = "/sharepoint-browser"
+            
+            # Create HTML iframe to embed SharePoint browser in chat
+            browser_html = f"""
+<div style="width: 100%; max-width: 100%; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; background: #0f1419;">
+    <div style="padding: 15px; background: #1a1f2e; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <h3 style="margin: 0; color: #fff; font-size: 16px;">📂 SharePoint File Browser</h3>
+        <p style="margin: 5px 0 0 0; color: #94a3b8; font-size: 12px;">Browse and select files from SharePoint</p>
+    </div>
+    <iframe 
+        src="{proxy_url}" 
+        style="width: 100%; height: 600px; border: none; display: block;"
+        title="SharePoint File Browser"
+        allow="clipboard-read; clipboard-write"
+    ></iframe>
+</div>
+<p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">
+    💡 <strong>Tip:</strong> Click on a file to select it, then click "Import Selected" to add it to your chat.
+</p>
+"""
+            
+            # Find the last assistant message and inject the browser
+            for msg in reversed(messages):
+                if msg.get("role") == "assistant":
+                    content = msg.get("content", "")
+                    
+                    # If content is a string, convert to list format
+                    if isinstance(content, str):
+                        msg["content"] = [
+                            {"type": "text", "text": content},
+                            {"type": "text", "text": browser_html}
+                        ]
+                    elif isinstance(content, list):
+                        # Add browser HTML as text block
+                        msg["content"].append({"type": "text", "text": browser_html})
+                    else:
+                        # Initialize as list
+                        msg["content"] = [
+                            {"type": "text", "text": browser_html}
+                        ]
+                    
+                    self._log("✅ Injected SharePoint browser iframe into chat response")
+                    break
+        
         return body
