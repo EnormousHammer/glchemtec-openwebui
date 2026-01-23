@@ -89,5 +89,4 @@ USER 1000
 EXPOSE 8080 8000
 
 # Override base image's entrypoint and use our startup script
-ENTRYPOINT []
-CMD ["/bin/bash", "/app/start.sh"]
+ENTRYPOINT ["/bin/bash", "/app/start.sh"]
