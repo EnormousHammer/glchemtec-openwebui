@@ -97,6 +97,33 @@ def _get_file_name(file_obj: Dict[str, Any]) -> str:
     return (file_obj.get("name") or file_obj.get("filename") or "").strip()
 
 
+def _extract_inline_images_from_messages(messages: list[dict]) -> list[dict]:
+    """
+    Extract OpenWebUI inline images from message content blocks:
+      {"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}
+    Returns: [{"url": "...", "name": "inline_001"}]
+    """
+    out = []
+    idx = 1
+    for msg in messages or []:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "image_url":
+                continue
+            iu = item.get("image_url") or {}
+            if not isinstance(iu, dict):
+                continue
+            url = iu.get("url")
+            if isinstance(url, str) and url.startswith("data:image/"):
+                out.append({"url": url, "name": f"inline_{idx:03d}"})
+                idx += 1
+    return out
+
+
 def _extract_all_files(body: dict, messages: list) -> List[Dict[str, Any]]:
     files: List[Dict[str, Any]] = []
     if isinstance(body.get("files"), list):
@@ -862,6 +889,12 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
 
         # Non-supported types: skip silently but keep base functionality intact
         log(f"Skipping unsupported file type: {name} ({mime})")
+
+    # ALSO include inline images injected into chat content by Functions/Filters
+    inline_images = _extract_inline_images_from_messages(messages)
+    if inline_images:
+        images.extend(inline_images)
+        log(f"Added {len(inline_images)} inline images from message content (Filter-injected).")
 
     return pdfs, images, texts
 
