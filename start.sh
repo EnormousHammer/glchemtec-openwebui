@@ -4,28 +4,36 @@
 
 cd /app
 
-echo "=== Starting Services ==="
-echo "Current directory: $(pwd)"
-echo "PORT environment variable: ${PORT:-8080}"
+echo "=== Starting Services ===" >&2
+echo "Current directory: $(pwd)" >&2
+echo "PORT environment variable: ${PORT:-8080}" >&2
 
-echo ""
-echo "=== Starting OpenAI Responses Proxy ==="
-python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 &
+echo "" >&2
+echo "=== Starting OpenAI Responses Proxy ===" >&2
+python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 >&2 &
+PROXY_PID=$!
+echo "Proxy started with PID: $PROXY_PID" >&2
 
 # Wait for proxy to be ready (up to 30 seconds)
 for i in {1..30}; do
   if (echo > /dev/tcp/127.0.0.1/8000) >/dev/null 2>&1; then
-    echo "✓ Proxy is up on port 8000"
+    echo "✓ Proxy is up on port 8000" >&2
     break
   fi
-  echo "Waiting for proxy... ($i/30)"
+  echo "Waiting for proxy... ($i/30)" >&2
   sleep 1
 done
 
-echo ""
-echo "=== Starting OpenWebUI ==="
-echo "PORT will be: ${PORT:-8080}"
-echo "OpenWebUI start script: /app/backend/start.sh"
+# Check if proxy process is still alive
+if ! kill -0 $PROXY_PID 2>/dev/null; then
+  echo "ERROR: Proxy process died!" >&2
+  wait $PROXY_PID 2>/dev/null || true
+fi
+
+echo "" >&2
+echo "=== Starting OpenWebUI ===" >&2
+echo "PORT will be: ${PORT:-8080}" >&2
+echo "OpenWebUI start script: /app/backend/start.sh" >&2
 
 # Check if start script exists
 if [ ! -f "/app/backend/start.sh" ]; then

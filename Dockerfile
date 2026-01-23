@@ -88,5 +88,6 @@ USER 1000
 # Expose ports (8080 for OpenWebUI, 8000 for proxy)
 EXPOSE 8080 8000
 
-# Start both services
+# Override base image's entrypoint and use our startup script
+ENTRYPOINT []
 CMD ["/bin/bash", "/app/start.sh"]
