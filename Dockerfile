@@ -46,8 +46,8 @@ COPY openai_responses_proxy.py /app/openai_responses_proxy.py
 # Place filters in both default locations to ensure auto-load
 COPY export_filter.py /app/backend/filters/export_filter.py
 COPY export_filter.py /app/backend/custom/filters/export_filter.py
-COPY ppt_pdf_vision_filter.py /app/backend/filters/ppt_pdf_vision_filter.py
-COPY ppt_pdf_vision_filter.py /app/backend/custom/filters/ppt_pdf_vision_filter.py
+COPY ppt_pdf_filter.py /app/backend/filters/ppt_pdf_filter.py
+COPY ppt_pdf_filter.py /app/backend/custom/filters/ppt_pdf_filter.py
 COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY start.sh /app/start.sh

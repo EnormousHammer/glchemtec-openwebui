@@ -11,9 +11,9 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false
-      # Route OpenAI calls directly to OpenAI (proxy disabled for now)
+      # Route OpenAI calls through local proxy on port 8000
       - key: OPENAI_API_BASE_URLS
-        value: "https://api.openai.com/v1"
+        value: "http://localhost:8000/v1"
       - key: MICROSOFT_CLIENT_ID
         sync: false
       - key: MICROSOFT_CLIENT_SECRET
