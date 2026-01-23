@@ -190,5 +190,12 @@ class Filter:
         self._log("=" * 50)
         return body
 
+    def stream(self, event: dict, __user__: Optional[dict] = None) -> dict:
+        """
+        Stream filter - passes through streaming output unchanged.
+        This method is required by OpenWebUI but we don't modify streaming output.
+        """
+        return event
+
     def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         return body

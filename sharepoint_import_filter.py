@@ -478,6 +478,13 @@ class Filter:
 
         return body
 
+    def stream(self, event: dict, __user__: Optional[dict] = None) -> dict:
+        """
+        Stream filter - passes through streaming output unchanged.
+        This method is required by OpenWebUI but we don't modify streaming output.
+        """
+        return event
+
     def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         """Output filter - injects SharePoint browser iframe when user requests to browse."""
         if not self.valves.enabled or not self.valves.enable_sharepoint:
