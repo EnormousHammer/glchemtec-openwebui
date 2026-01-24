@@ -42,7 +42,7 @@ class Filter:
 
         # PPTX pipeline
         render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
-        libreoffice_timeout_sec: int = Field(default=30, description="LibreOffice timeout (sec) - reduced for faster failure")
+        libreoffice_timeout_sec: int = Field(default=15, description="LibreOffice timeout (sec) - fail fast, skip if hangs")
 
         # Include PPTX extracted text/tables (helpful for copyable content)
         include_pptx_text: bool = Field(default=True, description="Extract slide text/tables via python-pptx (if available)")
@@ -176,11 +176,15 @@ class Filter:
             self._log("❌ PPTX->PDF produced no PDF file.")
             return None
         except subprocess.TimeoutExpired:
-            self._log(f"❌ LibreOffice conversion timed out after {self.valves.libreoffice_timeout_sec}s. Killing process...")
-            # Try to kill any lingering LibreOffice processes immediately
+            self._log(f"❌ LibreOffice conversion timed out after {self.valves.libreoffice_timeout_sec}s. Killing immediately...")
+            # Kill processes immediately - no waiting
             try:
-                subprocess.run(["pkill", "-9", "-f", "soffice"], timeout=2, capture_output=True)
-                subprocess.run(["pkill", "-9", "-f", "libreoffice"], timeout=2, capture_output=True)
+                # Force kill immediately
+                subprocess.run(["pkill", "-9", "-f", "soffice"], timeout=1, capture_output=True)
+                subprocess.run(["pkill", "-9", "-f", "libreoffice"], timeout=1, capture_output=True)
+                # Also try killing by PID if we can find it
+                subprocess.run(["killall", "-9", "soffice"], timeout=1, capture_output=True)
+                subprocess.run(["killall", "-9", "libreoffice"], timeout=1, capture_output=True)
             except:
                 pass
             return None
@@ -391,18 +395,20 @@ class Filter:
             with tempfile.TemporaryDirectory() as tmp:
                 pdf_path = None
 
-                # PPTX -> PDF
+                # PPTX -> PDF (with fast failure)
                 if is_pptx and self.valves.render_pptx_via_pdf:
                     pdf_path = self.convert_pptx_to_pdf(file_path, tmp)
                     if pdf_path:
                         self._log(f"✅ PPTX converted to PDF: {os.path.basename(pdf_path)}")
                     else:
-                        self._log("⚠️ PPTX->PDF failed. Will try best-effort text extraction only.")
+                        self._log("⚠️ PPTX->PDF failed or timed out. Using text extraction only (faster).")
 
-                    # optional: extract text/tables/notes (copyable)
+                # Always extract text/tables for PPTX (works even if PDF conversion fails)
+                if is_pptx:
                     extracted = self.extract_pptx_text_tables(file_path)
                     if extracted.get("slides"):
                         all_text_sections.append(self.format_pptx_text_tables(extracted, file_name))
+                        self._log(f"✅ Extracted text from {len(extracted.get('slides', []))} slides")
 
                 # PDF direct
                 if is_pdf:
