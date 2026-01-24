@@ -50,6 +50,9 @@ COPY ppt_pdf_filter.py /app/backend/filters/ppt_pdf_filter.py
 COPY ppt_pdf_filter.py /app/backend/custom/filters/ppt_pdf_filter.py
 COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
+COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
+COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
+COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
@@ -57,6 +60,11 @@ COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 # Modify OpenWebUI's startup script to start proxy first
 # Use printf instead of heredoc - more reliable in Dockerfile RUN commands
 RUN set -e && \
+    mkdir -p /app/backend/open_webui/static/branding /app/backend/open_webui/static/css && \
+    # Ensure custom theme is loaded by the frontend
+    printf '@import "/static/branding/glc-theme.css";\n' >> /app/backend/open_webui/static/css/custom.css && \
+    # Set favicon to GLC icon
+    cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico && \
     if [ -f /app/backend/start.sh ]; then \
         cp /app/backend/start.sh /app/backend/start.sh.original && \
         printf '#!/bin/bash\nset -e\ncd /app\necho "=== Starting OpenAI Responses Proxy ==="\npython3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &\nPROXY_PID=$!\necho "Proxy started with PID: $PROXY_PID"\nsleep 3\nif ! kill -0 $PROXY_PID 2>/dev/null; then\n  echo "ERROR: Proxy process died immediately!"\n  wait $PROXY_PID 2>/dev/null || true\n  exit 1\nelse\n  echo "✓ Proxy is running (PID: $PROXY_PID)"\nfi\necho "=== Starting OpenWebUI ==="\npython3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &\nexec bash /app/backend/start.sh.original "$@"\n' > /app/backend/start.sh && \

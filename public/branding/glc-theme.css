@@ -1,0 +1,77 @@
+/*
+ * GLChemTec Branding Theme for OpenWebUI
+ * Uses existing assets:
+ *   - /static/branding/GLC_Logo.png (header/sidebar)
+ *   - /static/branding/GLC_icon.png (favicon/icon if desired)
+ */
+
+:root {
+  --glc-navy: #0f2747;
+  --glc-cyan: #26c0d8;
+  --glc-slate: #132133;
+  --glc-bg: #0d1826;
+  --glc-panel: #111c2a;
+  --glc-text: #e9f0f5;
+  --glc-muted: #9bb3c9;
+}
+
+body {
+  background: var(--glc-bg);
+  color: var(--glc-text);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+/* Header / top bar */
+header, .top-bar, [class*="navbar"] {
+  background: var(--glc-slate) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Sidebar */
+aside, .sidebar {
+  background: var(--glc-panel) !important;
+  color: var(--glc-text);
+}
+
+/* Buttons */
+button, .btn, [class*="btn-primary"], .primary {
+  background: var(--glc-cyan) !important;
+  color: #0a1626 !important;
+  border: none !important;
+}
+button:hover, .btn:hover {
+  filter: brightness(0.95);
+}
+
+/* Inputs */
+input, textarea, select, .input {
+  background: #0f1c2c !important;
+  color: var(--glc-text) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Chat bubbles */
+.message.assistant, [class*="assistant"] {
+  background: rgba(38, 192, 216, 0.08) !important;
+  border: 1px solid rgba(38, 192, 216, 0.25) !important;
+}
+.message.user, [class*="user"] {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Links & accents */
+a { color: var(--glc-cyan); }
+small, .muted, .text-muted { color: var(--glc-muted) !important; }
+
+/* Logo placement */
+.app-logo, .logo, [class*="logo"] {
+  background: url("/static/branding/GLC_Logo.png") center left / contain no-repeat !important;
+  min-height: 32px;
+}
+
+/* Login page background (optional; can swap to a texture if added) */
+.login-page, [class*="login"], [data-page="login"] {
+  background: var(--glc-bg) !important;
+}
+
