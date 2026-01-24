@@ -38,6 +38,15 @@ app = FastAPI(title="OpenAI Responses Proxy")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 DEBUG = os.environ.get("PROXY_DEBUG", "true").lower() == "true"
+HTTP_CLIENT: httpx.AsyncClient | None = None
+
+# Keep-alive + HTTP/2 client for faster, reusable connections to the proxy/OpenAI.
+HTTP_TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=120.0, pool=120.0)
+HTTP_LIMITS = httpx.Limits(
+    max_keepalive_connections=20,
+    max_connections=50,
+    keepalive_expiry=300.0,
+)
 MAX_FILE_MB = 10
 MAX_TOTAL_MB = 40
 MAX_DOCX_CHARS = 40000  # safety cap
@@ -60,6 +69,37 @@ METRICS = {
     "last_error": "",
     "last_latency_ms": 0.0,
 }
+
+
+async def init_http_client() -> None:
+    """Initialize shared AsyncClient with keep-alive/HTTP2 for lower latency."""
+    global HTTP_CLIENT
+    if HTTP_CLIENT is None:
+        HTTP_CLIENT = httpx.AsyncClient(
+            timeout=HTTP_TIMEOUT,
+            limits=HTTP_LIMITS,
+            http2=True,
+        )
+
+
+async def get_http_client() -> httpx.AsyncClient:
+    """Return shared AsyncClient (initialized lazily)."""
+    if HTTP_CLIENT is None:
+        await init_http_client()
+    return HTTP_CLIENT
+
+
+@app.on_event("startup")
+async def _startup_client():
+    await init_http_client()
+
+
+@app.on_event("shutdown")
+async def _shutdown_client():
+    global HTTP_CLIENT
+    if HTTP_CLIENT:
+        await HTTP_CLIENT.aclose()
+        HTTP_CLIENT = None
 
 # Regex to find PDF markers: [__PDF_FILE_B64__ filename=xxx.pdf]base64data[/__PDF_FILE_B64__]
 PDF_MARKER_RE = re.compile(
@@ -976,19 +1016,19 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
     log(f"   Total payload size: {payload_size/1024:.1f}KB")
     log(f"✅ VERIFIED: All images, tables, and text content will be received by OpenAI")
     
-    async with httpx.AsyncClient(timeout=300.0) as client:
-        resp = await _post_with_retry(
-            client,
-            f"{OPENAI_BASE_URL}/responses",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            payload=payload,
-            attempts=3,
-            base_delay=1.0,
-            stream=False,
-        )
+    client = await get_http_client()
+    resp = await _post_with_retry(
+        client,
+        f"{OPENAI_BASE_URL}/responses",
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        payload=payload,
+        attempts=3,
+        base_delay=1.0,
+        stream=False,
+    )
         
         # Verify response
         if resp.status_code >= 400:
@@ -1099,24 +1139,25 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
     attempts = 3
     base_delay = 1.0
 
+    client = await get_http_client()
+
     for attempt in range(1, attempts + 1):
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                resp_context = await _post_with_retry(client, url, headers, payload, attempts=1, stream=True)
-                async with resp_context as resp:
-                    if resp.status_code >= 400:
-                        if resp.status_code in (429, 500, 502, 503, 504) and attempt < attempts:
-                            delay = base_delay * (2 ** (attempt - 1))
-                            log(f"❌ Responses stream error {resp.status_code}, retrying in {delay:.1f}s ({attempt}/{attempts})")
-                            await asyncio.sleep(delay)
-                            continue
-                        text = await resp.aread()
-                        error_msg = text.decode() if hasattr(text, "decode") else str(text)
-                        log(f"❌ Responses stream ERROR: HTTP {resp.status_code} - {error_msg[:200]}")
-                        METRICS["errors_total"] += 1
-                        METRICS["last_error"] = f"Stream HTTP {resp.status_code}: {error_msg[:200]}"
-                        raise HTTPException(status_code=resp.status_code, detail=error_msg)
-                    
+            resp_context = await _post_with_retry(client, url, headers, payload, attempts=1, stream=True)
+            async with resp_context as resp:
+                if resp.status_code >= 400:
+                    if resp.status_code in (429, 500, 502, 503, 504) and attempt < attempts:
+                        delay = base_delay * (2 ** (attempt - 1))
+                        log(f"❌ Responses stream error {resp.status_code}, retrying in {delay:.1f}s ({attempt}/{attempts})")
+                        await asyncio.sleep(delay)
+                        continue
+                    text = await resp.aread()
+                    error_msg = text.decode() if hasattr(text, "decode") else str(text)
+                    log(f"❌ Responses stream ERROR: HTTP {resp.status_code} - {error_msg[:200]}")
+                    METRICS["errors_total"] += 1
+                    METRICS["last_error"] = f"Stream HTTP {resp.status_code}: {error_msg[:200]}"
+                    raise HTTPException(status_code=resp.status_code, detail=error_msg)
+                
                     # Success - log that stream started
                     if image_count > 0:
                         log(f"✅ Streaming started: {image_count} images sent, waiting for response chunks...")
@@ -1172,23 +1213,23 @@ async def call_chat_completions(body: dict) -> dict:
     """
     Forward to standard Chat Completions API (fallback when no PDFs).
     """
-    async with httpx.AsyncClient(timeout=300.0) as client:
-        resp = await _post_with_retry(
-            client,
-            f"{OPENAI_BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            payload=body,
-            attempts=3,
-            base_delay=1.0,
-            stream=False,
-        )
-        if resp.status_code >= 400:
-            log(f"Chat Completions error: {resp.status_code}")
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        return resp.json()
+    client = await get_http_client()
+    resp = await _post_with_retry(
+        client,
+        f"{OPENAI_BASE_URL}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        payload=body,
+        attempts=3,
+        base_delay=1.0,
+        stream=False,
+    )
+    if resp.status_code >= 400:
+        log(f"Chat Completions error: {resp.status_code}")
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    return resp.json()
 
 
 def responses_to_chat_completion(resp_data: dict, model: str) -> dict:
@@ -1345,18 +1386,18 @@ async def chat_completions(request: Request):
     if stream:
         # Stream from Chat Completions
         async def stream_response():
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{OPENAI_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json=body
-                ) as resp:
-                    async for chunk in resp.aiter_bytes():
-                        yield chunk
+            client = await get_http_client()
+            async with client.stream(
+                "POST",
+                f"{OPENAI_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=body
+            ) as resp:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
         
         return StreamingResponse(stream_response(), media_type="text/event-stream")
     

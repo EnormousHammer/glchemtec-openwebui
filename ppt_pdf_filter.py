@@ -29,15 +29,17 @@ class Filter:
         debug: bool = Field(default=True, description="Enable debug logging")
 
         # ===== Rendering quality (CRITICAL) =====
-        dpi: int = Field(default=300, description="DPI for PDF rendering (300 recommended for spectra)")
-        max_pages: int = Field(default=12, description="Max pages/slides to render as images")
+        # Use higher DPI to keep fine spectra labels legible.
+        dpi: int = Field(default=600, description="DPI for PDF rendering (600 for spectra/NMR clarity)")
+        # Allow more slides by default to avoid truncating longer decks.
+        max_pages: int = Field(default=30, description="Max pages/slides to render as images")
 
         # Output format: PNG is best for small text/spectra (lossless)
         output_format: str = Field(default="png", description="png (recommended) or jpeg")
         jpeg_quality: int = Field(default=92, description="JPEG quality if output_format=jpeg")
 
-        # Size & safety limits (prevents huge payloads)
-        max_total_image_mb: float = Field(default=18.0, description="Max total base64 image payload (MB)")
+        # Size & safety limits (prevents huge payloads) — bumped to avoid cutting pages at higher DPI
+        max_total_image_mb: float = Field(default=64.0, description="Max total base64 image payload (MB)")
         # If you truly need unlimited, raise max_total_image_mb, but keep an eye on API payload limits.
 
         # PPTX pipeline
