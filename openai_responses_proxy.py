@@ -1300,9 +1300,9 @@ async def chat_completions(request: Request):
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
     
-    # If we have PDFs/images/text blocks, use Responses API
-    if all_pdfs or all_images or all_text_blocks:
-        log("Using Responses API for document/image/text analysis")
+    # Only use Responses API for PDFs - use faster Chat Completions for images
+    if all_pdfs:
+        log("Using Responses API for PDF analysis")
         try:
             if stream:
                 async def proxied_stream():
@@ -1322,8 +1322,13 @@ async def chat_completions(request: Request):
             # Fall back to chat completions
             pass
     
-    # No docs/images or Responses API failed - use standard Chat Completions
-    log("Using standard Chat Completions API")
+    # For images (no PDFs), use fast Chat Completions API with vision support
+    # For PDFs, Responses API is used above
+    # For text-only, use standard Chat Completions
+    if all_images and not all_pdfs:
+        log(f"Using fast Chat Completions API with vision support for {len(all_images)} images")
+    else:
+        log("Using standard Chat Completions API")
     
     # Clean PDF markers from messages before forwarding
     cleaned_messages = []
