@@ -53,6 +53,8 @@ COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_f
 COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
 COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
+# Also expose theme as the main custom.css so the frontend loads it without config tweaks
+COPY public/branding/glc-theme.css /app/backend/open_webui/static/custom.css
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
@@ -61,8 +63,6 @@ COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 # Use printf instead of heredoc - more reliable in Dockerfile RUN commands
 RUN set -e && \
     mkdir -p /app/backend/open_webui/static/branding /app/backend/open_webui/static/css && \
-    # Ensure custom theme is loaded by the frontend
-    printf '@import "/static/branding/glc-theme.css";\n' >> /app/backend/open_webui/static/css/custom.css && \
     # Set favicon to GLC icon
     cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico && \
     if [ -f /app/backend/start.sh ]; then \
