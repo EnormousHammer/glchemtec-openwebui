@@ -42,7 +42,7 @@ class Filter:
 
         # PPTX pipeline
         render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
-        libreoffice_timeout_sec: int = Field(default=60, description="LibreOffice timeout (sec)")
+        libreoffice_timeout_sec: int = Field(default=30, description="LibreOffice timeout (sec) - reduced for faster failure")
 
         # Include PPTX extracted text/tables (helpful for copyable content)
         include_pptx_text: bool = Field(default=True, description="Extract slide text/tables via python-pptx (if available)")

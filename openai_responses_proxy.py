@@ -2750,9 +2750,31 @@ async def list_models():
             model_count = len(data.get("data", []))
             log(f"GET /v1/models - Success! Returning {model_count} models")
             return JSONResponse(content=data)
+    except httpx.HTTPStatusError as e:
+        log(f"GET /v1/models - HTTP Error {e.response.status_code}: {e.response.text[:200]}")
+        # Return proper JSON error response instead of raising
+        return JSONResponse(
+            status_code=e.response.status_code,
+            content={
+                "error": {
+                    "message": f"OpenAI API error: {e.response.status_code} {e.response.reason_phrase}",
+                    "type": "api_error",
+                    "code": e.response.status_code
+                }
+            }
+        )
     except Exception as e:
-        log(f"GET /v1/models - ERROR: {e}")
-        raise
+        log(f"GET /v1/models - ERROR: {type(e).__name__}: {e}")
+        # Return proper JSON error response
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "message": f"Proxy error: {str(e)}",
+                    "type": "proxy_error"
+                }
+            }
+        )
 
 
 @app.get("/metrics")

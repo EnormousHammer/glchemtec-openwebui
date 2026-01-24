@@ -73,6 +73,19 @@ services:
       # Proxy settings
       - key: PROXY_DEBUG
         value: "true"
+      # SharePoint integration
+      - key: ENABLE_SHAREPOINT
+        value: "true"
+      - key: SHAREPOINT_CLIENT_ID
+        sync: false
+      - key: SHAREPOINT_CLIENT_SECRET
+        sync: false
+      - key: SHAREPOINT_TENANT_ID
+        sync: false
+      - key: SHAREPOINT_SITE_URL
+        sync: false
+      - key: SHAREPOINT_FOLDER
+        value: "Documents"
       # Claude/Anthropic API for document analysis
       - key: ANTHROPIC_API_KEY
         sync: false
