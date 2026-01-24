@@ -56,6 +56,7 @@ COPY start.sh /app/start.sh
 RUN if [ -f /app/backend/start.sh ]; then \
     cp /app/backend/start.sh /app/backend/start.sh.original && \
     echo '#!/bin/bash' > /app/backend/start.sh && \
+    echo 'cd /app' >> /app/backend/start.sh && \
     echo 'echo "=== Starting OpenAI Responses Proxy ==="' >> /app/backend/start.sh && \
     echo 'python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 >&2 &' >> /app/backend/start.sh && \
     echo 'PROXY_PID=$!' >> /app/backend/start.sh && \
