@@ -59,7 +59,7 @@ COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 RUN set -e && \
     if [ -f /app/backend/start.sh ]; then \
         cp /app/backend/start.sh /app/backend/start.sh.original && \
-        cat > /app/backend/start.sh << 'EOFSCRIPT'
+        cat > /app/backend/start.sh << 'EOFSCRIPT' && \
 #!/bin/bash
 set -e
 cd /app
