@@ -32,7 +32,7 @@ class Filter:
         company_logo_path: str = Field(default="", description="Path to company logo image")
         primary_color: str = Field(default="#1d2b3a", description="Primary brand color (hex)")
         secondary_color: str = Field(default="#e6eef5", description="Secondary brand color (hex)")
-        enable_sharepoint: bool = Field(default=False, description="Enable SharePoint integration")
+        enable_sharepoint: bool = Field(default=False, description="Enable SharePoint integration (forced off)")
         sharepoint_site_url: str = Field(default="", description="SharePoint site URL")
         sharepoint_folder: str = Field(default="Documents", description="SharePoint folder path")
 
@@ -41,6 +41,8 @@ class Filter:
             # Get export service URL from env if set, otherwise use default
             export_url = os.environ.get("EXPORT_SERVICE_URL", "http://localhost:8000")
             self.valves = self.Valves(export_service_url=export_url)
+            # Force SharePoint export off regardless of env
+            self.valves.enable_sharepoint = False
             self._log("Export filter initialized")
         except Exception as e:
             # If initialization fails, disable the filter to prevent crashes
@@ -197,8 +199,8 @@ class Filter:
     
     def _upload_to_sharepoint(self, file_path: str, filename: str) -> Optional[str]:
         """Upload file to SharePoint and return the sharepoint URL."""
-        if not self.valves.enable_sharepoint or not self.valves.sharepoint_site_url:
-            return None
+        # SharePoint uploads are disabled
+        return None
         
         try:
             # SharePoint REST API upload
