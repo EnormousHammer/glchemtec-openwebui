@@ -42,8 +42,11 @@ def discover_schema(cursor):
     
     return None, None
 
+# Cache schema to avoid re-discovering every time
+_SCHEMA_CACHE = {"table_name": None, "columns": None}
+
 def enforce_connection():
-    """Enforce OpenAI connection - discovers actual schema first."""
+    """Enforce OpenAI connection - uses cached schema to avoid blocking."""
     DATA_DIR = Path("/app/backend/data")
     DB_FILE = DATA_DIR / "webui.db"
     
@@ -52,16 +55,24 @@ def enforce_connection():
         return False
     
     try:
-        conn = sqlite3.connect(str(DB_FILE))
+        # Use WAL mode for better concurrency (allows concurrent reads)
+        conn = sqlite3.connect(str(DB_FILE), timeout=5.0)  # 5 second timeout
+        conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging for concurrency
         cursor = conn.cursor()
         
-        # Discover actual schema
-        table_name, columns = discover_schema(cursor)
-        
-        if not table_name:
-            print("[CONFIG] No connection table found. Cannot set connection.")
-            conn.close()
-            return False
+        # Use cached schema if available, otherwise discover once
+        if _SCHEMA_CACHE["table_name"] is None:
+            table_name, columns = discover_schema(cursor)
+            if table_name:
+                _SCHEMA_CACHE["table_name"] = table_name
+                _SCHEMA_CACHE["columns"] = columns
+            else:
+                print("[CONFIG] No connection table found. Cannot set connection.")
+                conn.close()
+                return False
+        else:
+            table_name = _SCHEMA_CACHE["table_name"]
+            columns = _SCHEMA_CACHE["columns"]
         
         # Build query based on actual columns
         connection_data = json.dumps({
@@ -159,9 +170,9 @@ def main():
     # Set initial connection
     enforce_connection()
     
-    # Run continuously - check every 2 minutes to prevent resets
+    # Run continuously - check every 5 minutes to prevent resets (reduced frequency to avoid blocking)
     while True:
-        time.sleep(120)  # Check every 2 minutes
+        time.sleep(300)  # Check every 5 minutes (reduced from 2 to avoid database contention)
         enforce_connection()
 
 if __name__ == "__main__":
