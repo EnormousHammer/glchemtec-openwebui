@@ -177,9 +177,10 @@ class Filter:
             return None
         except subprocess.TimeoutExpired:
             self._log(f"❌ LibreOffice conversion timed out after {self.valves.libreoffice_timeout_sec}s. Killing process...")
-            # Try to kill any lingering LibreOffice processes
+            # Try to kill any lingering LibreOffice processes immediately
             try:
-                subprocess.run(["pkill", "-f", "soffice"], timeout=5, capture_output=True)
+                subprocess.run(["pkill", "-9", "-f", "soffice"], timeout=2, capture_output=True)
+                subprocess.run(["pkill", "-9", "-f", "libreoffice"], timeout=2, capture_output=True)
             except:
                 pass
             return None
