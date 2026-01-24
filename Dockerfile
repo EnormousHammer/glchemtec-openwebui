@@ -55,25 +55,34 @@ COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 
 # Modify OpenWebUI's startup script to start proxy first
-RUN if [ -f /app/backend/start.sh ]; then \
-    cp /app/backend/start.sh /app/backend/start.sh.original && \
-    echo '#!/bin/bash' > /app/backend/start.sh && \
-    echo 'cd /app' >> /app/backend/start.sh && \
-    echo 'echo "=== Starting OpenAI Responses Proxy ==="' >> /app/backend/start.sh && \
-    echo 'python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &' >> /app/backend/start.sh && \
-    echo 'PROXY_PID=$!' >> /app/backend/start.sh && \
-    echo 'echo "Proxy started with PID: $PROXY_PID"' >> /app/backend/start.sh && \
-    echo 'sleep 3' >> /app/backend/start.sh && \
-    echo 'if ! kill -0 $PROXY_PID 2>/dev/null; then' >> /app/backend/start.sh && \
-    echo '  echo "ERROR: Proxy process died immediately!"' >> /app/backend/start.sh && \
-    echo '  wait $PROXY_PID 2>/dev/null || true' >> /app/backend/start.sh && \
-    echo 'else' >> /app/backend/start.sh && \
-    echo '  echo "✓ Proxy is running (PID: $PROXY_PID)"' >> /app/backend/start.sh && \
-    echo 'fi' >> /app/backend/start.sh && \
-    echo 'echo "=== Starting OpenWebUI ==="' >> /app/backend/start.sh && \
-    echo 'python3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &' >> /app/backend/start.sh && \
-    echo 'exec bash /app/backend/start.sh.original "$@"' >> /app/backend/start.sh && \
-    chmod +x /app/backend/start.sh; \
+# Create the modified startup script using a heredoc for reliability
+RUN set -e && \
+    if [ -f /app/backend/start.sh ]; then \
+        cp /app/backend/start.sh /app/backend/start.sh.original && \
+        cat > /app/backend/start.sh << 'EOFSCRIPT'
+#!/bin/bash
+set -e
+cd /app
+echo "=== Starting OpenAI Responses Proxy ==="
+python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &
+PROXY_PID=$!
+echo "Proxy started with PID: $PROXY_PID"
+sleep 3
+if ! kill -0 $PROXY_PID 2>/dev/null; then
+  echo "ERROR: Proxy process died immediately!"
+  wait $PROXY_PID 2>/dev/null || true
+  exit 1
+else
+  echo "✓ Proxy is running (PID: $PROXY_PID)"
+fi
+echo "=== Starting OpenWebUI ==="
+python3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &
+exec bash /app/backend/start.sh.original "$@"
+EOFSCRIPT
+        chmod +x /app/backend/start.sh && \
+        echo "✓ Successfully modified /app/backend/start.sh"; \
+    else \
+        echo "⚠️ WARNING: /app/backend/start.sh not found - proxy injection skipped"; \
     fi
 
 # Create directories with proper permissions for NLTK and other data
