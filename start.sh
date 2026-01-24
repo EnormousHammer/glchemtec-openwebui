@@ -94,6 +94,8 @@ EOF
 cp /tmp/glc-theme.css /app/backend/data/static/custom.css 2>/dev/null || true
 cp /tmp/glc-theme.css /app/backend/open_webui/static/custom.css 2>/dev/null || true
 cp /tmp/glc-theme.css /app/backend/open_webui/static/css/custom.css 2>/dev/null || true
+cp /tmp/glc-theme.css /app/backend/static/custom.css 2>/dev/null || true
+cp /tmp/glc-theme.css /app/backend/static/css/custom.css 2>/dev/null || true
 
 if [ -f "/app/backend/open_webui/static/branding/GLC_icon.png" ]; then
   cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico 2>/dev/null || true
