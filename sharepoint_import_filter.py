@@ -44,17 +44,17 @@ class Filter:
 
     def __init__(self):
         try:
-            # Use hardcoded GLChemTec values, with env override if needed
-            sharepoint_url = os.environ.get("SHAREPOINT_SITE_URL", SHAREPOINT_SITE_URL)
-            sharepoint_folder = os.environ.get("SHAREPOINT_FOLDER", "")
-            enable_sp = os.environ.get("ENABLE_SHAREPOINT", "true").lower() == "true"
+            # Hardcoded GLChemTec values - always enabled
+            sharepoint_url = SHAREPOINT_SITE_URL
+            sharepoint_folder = ""  # Empty = browse from root
+            enable_sp = True  # Always enabled
             
             self.valves = self.Valves(
                 sharepoint_site_url=sharepoint_url,
                 sharepoint_folder=sharepoint_folder,
                 enable_sharepoint=enable_sp
             )
-            self._log("SharePoint import filter initialized")
+            self._log("SharePoint import filter initialized (HARDCODED ENABLED)")
             self._log(f"Site URL: {sharepoint_url}")
             self._log(f"SharePoint enabled: {enable_sp}")
         except Exception as e:
