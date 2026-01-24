@@ -15,11 +15,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-# GLChemTec SharePoint Credentials
-SHAREPOINT_CLIENT_ID = "1abb5a43-1d6f-4d0e-ae95-eab2a963a4db"
-SHAREPOINT_CLIENT_SECRET = "iMq8Q~2En3-dLXCUyw706-bBU2DQ0cOPHd9Xj38dG2"
-SHAREPOINT_TENANT_ID = "fb807ad4-223e-4e42-97f7-b0029deb0e69"
-SHAREPOINT_SITE_URL = "https://glchemtecint.sharepoint.com/"
+# SharePoint Credentials - Read from environment variables (set in Render)
+# Do NOT hardcode secrets - GitHub will block the push
+SHAREPOINT_CLIENT_ID = os.environ.get("SHAREPOINT_CLIENT_ID", "")
+SHAREPOINT_CLIENT_SECRET = os.environ.get("SHAREPOINT_CLIENT_SECRET", "")
+SHAREPOINT_TENANT_ID = os.environ.get("SHAREPOINT_TENANT_ID", "")
+SHAREPOINT_SITE_URL = os.environ.get("SHAREPOINT_SITE_URL", "https://glchemtecint.sharepoint.com/")
 
 
 class Filter:
