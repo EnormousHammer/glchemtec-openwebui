@@ -56,5 +56,9 @@ fi
 # Ensure PORT is available to OpenWebUI
 export PORT=${PORT:-8080}
 
+# Force OpenAI connection to localhost:8000/v1 before launching OpenWebUI
+python3 /app/set_default_connection.py >/tmp/connection_default.log 2>&1 || true
+python3 /app/set_connection_on_startup.py >/tmp/connection_enforce.log 2>&1 &
+
 echo "Executing OpenWebUI start script..."
 exec /app/backend/start.sh
