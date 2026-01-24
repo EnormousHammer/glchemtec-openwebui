@@ -1029,49 +1029,49 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
         base_delay=1.0,
         stream=False,
     )
+    
+    # Verify response
+    if resp.status_code >= 400:
+        error_text = resp.text[:500] if hasattr(resp, 'text') else str(resp)
+        log(f"❌ Responses API ERROR: HTTP {resp.status_code}")
+        log(f"Error details: {error_text}")
+        METRICS["errors_total"] += 1
+        METRICS["last_error"] = f"HTTP {resp.status_code}: {error_text[:200]}"
+        raise HTTPException(status_code=resp.status_code, detail=error_text)
+    
+    # Success - parse and validate response
+    try:
+        response_data = resp.json()
         
-        # Verify response
-        if resp.status_code >= 400:
-            error_text = resp.text[:500] if hasattr(resp, 'text') else str(resp)
-            log(f"❌ Responses API ERROR: HTTP {resp.status_code}")
-            log(f"Error details: {error_text}")
-            METRICS["errors_total"] += 1
-            METRICS["last_error"] = f"HTTP {resp.status_code}: {error_text[:200]}"
-            raise HTTPException(status_code=resp.status_code, detail=error_text)
-        
-        # Success - parse and validate response
-        try:
-            response_data = resp.json()
+        # Verify response structure
+        if not isinstance(response_data, dict):
+            log(f"⚠️ WARNING: Unexpected response type: {type(response_data)}")
+        else:
+            # Check for output in response (indicates successful processing)
+            output = response_data.get("output", [])
+            has_output = len(output) > 0
             
-            # Verify response structure
-            if not isinstance(response_data, dict):
-                log(f"⚠️ WARNING: Unexpected response type: {type(response_data)}")
+            # Check usage stats (indicates API processed the request)
+            usage = response_data.get("usage", {})
+            has_usage = bool(usage)
+            
+            if has_output or has_usage:
+                log(f"✅ SUCCESS: OpenAI received and processed the request")
+                log(f"   - Response ID: {response_data.get('id', 'N/A')}")
+                log(f"   - Output items: {len(output)}")
+                log(f"   - Usage stats: {bool(usage)}")
+                if image_count > 0:
+                    log(f"   - Images sent: {image_count} (verified in payload)")
             else:
-                # Check for output in response (indicates successful processing)
-                output = response_data.get("output", [])
-                has_output = len(output) > 0
-                
-                # Check usage stats (indicates API processed the request)
-                usage = response_data.get("usage", {})
-                has_usage = bool(usage)
-                
-                if has_output or has_usage:
-                    log(f"✅ SUCCESS: OpenAI received and processed the request")
-                    log(f"   - Response ID: {response_data.get('id', 'N/A')}")
-                    log(f"   - Output items: {len(output)}")
-                    log(f"   - Usage stats: {bool(usage)}")
-                    if image_count > 0:
-                        log(f"   - Images sent: {image_count} (verified in payload)")
-                else:
-                    log(f"⚠️ WARNING: Response received but no output/usage data found")
-            
-            return response_data
-        except json.JSONDecodeError as e:
-            log(f"❌ ERROR: Failed to parse JSON response: {e}")
-            log(f"Response text (first 500 chars): {resp.text[:500] if hasattr(resp, 'text') else 'N/A'}")
-            METRICS["errors_total"] += 1
-            METRICS["last_error"] = f"JSON parse error: {str(e)}"
-            raise HTTPException(status_code=502, detail="Invalid JSON response from OpenAI")
+                log(f"⚠️ WARNING: Response received but no output/usage data found")
+        
+        return response_data
+    except json.JSONDecodeError as e:
+        log(f"❌ ERROR: Failed to parse JSON response: {e}")
+        log(f"Response text (first 500 chars): {resp.text[:500] if hasattr(resp, 'text') else 'N/A'}")
+        METRICS["errors_total"] += 1
+        METRICS["last_error"] = f"JSON parse error: {str(e)}"
+        raise HTTPException(status_code=502, detail="Invalid JSON response from OpenAI")
 
 
 async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], images: list[dict] = None, texts: list[str] = None):
