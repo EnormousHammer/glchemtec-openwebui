@@ -53,17 +53,6 @@ COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_f
 COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
 COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
-# Expose theme as custom.css in both static roots (cache-safe)
-COPY public/branding/glc-theme.css /app/backend/open_webui/static/custom.css
-COPY public/branding/glc-theme.css /app/backend/open_webui/static/css/custom.css
-# Also place theme in base static paths to override defaults
-COPY public/branding/glc-theme.css /app/backend/static/custom.css
-COPY public/branding/glc-theme.css /app/backend/static/css/custom.css
-# Also place theme in data static override (if mounted)
-COPY public/branding/glc-theme.css /app/backend/data/static/custom.css
-# Inject fallback custom.js to force-load theme if custom.css is skipped
-COPY public/branding/custom.js /app/backend/open_webui/static/custom.js
-COPY public/branding/custom.js /app/backend/data/static/custom.js
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
