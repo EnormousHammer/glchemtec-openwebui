@@ -1936,337 +1936,16 @@ async def generate_report_docx(report: dict):
 
 # SharePoint Browser API Endpoints
 @app.get("/sharepoint-browser")
-async def sharepoint_browser_page():
-    """Serve SharePoint browser HTML page."""
-    html_content = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SharePoint File Browser - GLChemTec</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f1419;
-            color: #fff;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
-            background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .header h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-        .header p {
-            color: #94a3b8;
-            font-size: 14px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        button {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background: #2563eb;
-        }
-        button:disabled {
-            background: #475569;
-            cursor: not-allowed;
-        }
-        input[type="text"] {
-            flex: 1;
-            min-width: 200px;
-            padding: 10px 15px;
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 14px;
-        }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #3b82f6;
-        }
-        .file-list {
-            background: #1e293b;
-            border-radius: 12px;
-            border: 1px solid #334155;
-            overflow: hidden;
-        }
-        .file-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #334155;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .file-item:hover {
-            background: #334155;
-        }
-        .file-item.selected {
-            background: #1e40af;
-        }
-        .file-item:last-child {
-            border-bottom: none;
-        }
-        .file-icon {
-            width: 40px;
-            height: 40px;
-            background: #475569;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-size: 20px;
-        }
-        .file-info {
-            flex: 1;
-        }
-        .file-name {
-            font-weight: 500;
-            margin-bottom: 5px;
-        }
-        .file-meta {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #94a3b8;
-        }
-        .error {
-            background: #7f1d1d;
-            border: 1px solid #991b1b;
-            color: #fca5a5;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .success {
-            background: #14532d;
-            border: 1px solid #166534;
-            color: #86efac;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📂 SharePoint File Browser</h1>
-            <p>Browse and import files from SharePoint for analysis in OpenWebUI</p>
-        </div>
-        
-        <div id="message"></div>
-        
-        <div class="controls">
-            <input type="text" id="searchInput" placeholder="Search files... (Press Enter)">
-            <button onclick="searchFiles()">Search</button>
-            <button onclick="listFiles()">Refresh</button>
-            <button onclick="importSelected()" id="importBtn" disabled>Import Selected</button>
-        </div>
-        
-        <div class="file-list" id="fileList">
-            <div class="loading">Loading files...</div>
-        </div>
-    </div>
-
-    <script>
-        let selectedFile = null;
-        const apiBase = window.location.origin;
-
-        async function listFiles() {
-            const fileList = document.getElementById('fileList');
-            fileList.innerHTML = '<div class="loading">Loading files from SharePoint...</div>';
-            
-            try {
-                const response = await fetch(`${apiBase}/api/v1/sharepoint/files`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to load files');
-                }
-                
-                const data = await response.json();
-                displayFiles(data.files || []);
-            } catch (error) {
-                showError('Failed to load files: ' + error.message + '. Make sure SharePoint is configured in environment variables.');
-                fileList.innerHTML = '<div class="error">Error loading files. Check that SHAREPOINT_CLIENT_ID, SHAREPOINT_CLIENT_SECRET, SHAREPOINT_TENANT_ID, and SHAREPOINT_SITE_URL are set.</div>';
-            }
-        }
-
-        async function searchFiles() {
-            const query = document.getElementById('searchInput').value.trim();
-            if (!query) return;
-            
-            const fileList = document.getElementById('fileList');
-            fileList.innerHTML = '<div class="loading">Searching...</div>';
-            
-            try {
-                const response = await fetch(`${apiBase}/api/v1/sharepoint/search?q=${encodeURIComponent(query)}`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (!response.ok) throw new Error('Search failed');
-                
-                const data = await response.json();
-                displayFiles(data.files || []);
-            } catch (error) {
-                showError('Search failed: ' + error.message);
-            }
-        }
-
-        function displayFiles(files) {
-            const fileList = document.getElementById('fileList');
-            
-            if (files.length === 0) {
-                fileList.innerHTML = '<div class="loading">No files found</div>';
-                return;
-            }
-            
-            fileList.innerHTML = files.map(file => `
-                <div class="file-item" onclick="selectFile('${file.id}', '${file.name.replace(/'/g, "\\'")}', this)">
-                    <div class="file-icon">${getFileIcon(file.name)}</div>
-                    <div class="file-info">
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-meta">${formatSize(file.size)} • ${formatDate(file.modified)}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function selectFile(id, name, element) {
-            selectedFile = { id, name };
-            document.getElementById('importBtn').disabled = false;
-            
-            // Highlight selected
-            document.querySelectorAll('.file-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-            element.classList.add('selected');
-        }
-
-        async function importSelected() {
-            if (!selectedFile) return;
-            
-            showMessage('Importing file...', 'loading');
-            
-            try {
-                const response = await fetch(`${apiBase}/api/v1/sharepoint/import`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_id: selectedFile.id })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Import failed');
-                }
-                
-                const data = await response.json();
-                showMessage(`✅ File "${selectedFile.name}" imported successfully! You can now use it in OpenWebUI chat.`, 'success');
-                
-                // Reset selection
-                selectedFile = null;
-                document.getElementById('importBtn').disabled = true;
-                document.querySelectorAll('.file-item').forEach(item => {
-                    item.classList.remove('selected');
-                });
-            } catch (error) {
-                showError('Failed to import file: ' + error.message);
-            }
-        }
-
-        function getFileIcon(name) {
-            const ext = name.split('.').pop()?.toLowerCase();
-            if (['pdf'].includes(ext)) return '📄';
-            if (['doc', 'docx'].includes(ext)) return '📝';
-            if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
-            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return '🖼️';
-            if (['pptx', 'ppt'].includes(ext)) return '📽️';
-            return '📎';
-        }
-
-        function formatSize(bytes) {
-            if (!bytes) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
-        }
-
-        function formatDate(dateStr) {
-            if (!dateStr) return 'Unknown';
-            try {
-                return new Date(dateStr).toLocaleDateString();
-            } catch {
-                return dateStr;
-            }
-        }
-
-        function showMessage(msg, type) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.className = type;
-            msgDiv.textContent = msg;
-            msgDiv.style.display = 'block';
-            if (type !== 'error') {
-                setTimeout(() => msgDiv.style.display = 'none', 5000);
-            }
-        }
-
-        function showError(msg) {
-            showMessage(msg, 'error');
-        }
-
-        // Enter key to search
-        document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchFiles();
-        });
-
-        // Load files on page load
-        listFiles();
-    </script>
-</body>
-</html>
-    """
-    return HTMLResponse(content=html_content)
+async def sharepoint_browser_page_old():
+    """Old SharePoint browser - redirects to new one."""
+    # Redirect to the main sharepoint-browser endpoint
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/sharepoint-browser")
 
 
 @app.get("/api/v1/sharepoint/files")
-async def list_sharepoint_files_api():
-    """API endpoint to list SharePoint files."""
+async def list_sharepoint_files_api(folder: str = ""):
+    """API endpoint to list SharePoint files and folders. Supports folder parameter for navigation."""
     try:
         # Check environment variables first
         client_id = os.environ.get("SHAREPOINT_CLIENT_ID", "")
@@ -2300,12 +1979,17 @@ async def list_sharepoint_files_api():
         if not filter_instance.valves.enable_sharepoint:
             raise HTTPException(status_code=403, detail="SharePoint integration not enabled in filter")
         
-        files = filter_instance._list_sharepoint_files()
+        # Use the new method that includes folders for navigation
+        items = filter_instance._list_sharepoint_items(folder_path=folder, include_folders=True)
         
-        if files is None:
+        if items is None:
             raise HTTPException(status_code=500, detail="Failed to retrieve files. Check SharePoint credentials and permissions.")
         
-        return JSONResponse(content={"files": files})
+        return JSONResponse(content={
+            "files": items,
+            "current_folder": folder or "/",
+            "parent_folder": "/".join(folder.split("/")[:-1]) if folder else None
+        })
     except HTTPException:
         raise
     except Exception as e:
@@ -2316,8 +2000,8 @@ async def list_sharepoint_files_api():
 
 
 @app.get("/api/v1/sharepoint/search")
-async def search_sharepoint_files_api(q: str):
-    """API endpoint to search SharePoint files."""
+async def search_sharepoint_files_api(q: str, folder: str = ""):
+    """API endpoint to search SharePoint files within a folder."""
     try:
         from sharepoint_import_filter import Filter
         filter_instance = Filter()
@@ -2325,12 +2009,15 @@ async def search_sharepoint_files_api(q: str):
         if not filter_instance.valves.enable_sharepoint:
             raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
         
-        # For now, list all files and filter client-side
-        # In future, can implement server-side search
-        files = filter_instance._list_sharepoint_files()
-        filtered = [f for f in files if q.lower() in f.get("name", "").lower()]
+        # List items in the specified folder and filter by search query
+        items = filter_instance._list_sharepoint_items(folder_path=folder, include_folders=True)
+        filtered = [f for f in items if q.lower() in f.get("name", "").lower()]
         
-        return JSONResponse(content={"files": filtered})
+        return JSONResponse(content={
+            "files": filtered,
+            "current_folder": folder or "/",
+            "query": q
+        })
     except Exception as e:
         log(f"Failed to search SharePoint files: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -2342,6 +2029,7 @@ async def import_sharepoint_file_api(request: Request):
     try:
         body = await request.json()
         file_id = body.get("file_id")
+        drive_id = body.get("drive_id", "")
         
         if not file_id:
             raise HTTPException(status_code=400, detail="file_id is required")
@@ -2352,22 +2040,32 @@ async def import_sharepoint_file_api(request: Request):
         if not filter_instance.valves.enable_sharepoint:
             raise HTTPException(status_code=403, detail="SharePoint integration not enabled")
         
-        # Get file details and download
-        files = filter_instance._list_sharepoint_files()
+        # If drive_id not provided, get it from site info
+        if not drive_id:
+            info = filter_instance._get_site_and_drive_info()
+            if info:
+                drive_id = info.get("drive_id", "")
+        
+        # Get file details - search in all items to find the file
+        items = filter_instance._list_sharepoint_items(include_folders=False)
         target_file = None
-        for f in files:
+        for f in items:
             if f.get("id") == file_id:
                 target_file = f
                 break
         
         if not target_file:
-            raise HTTPException(status_code=404, detail="File not found")
+            # File might be in a subfolder, try to download directly with the IDs we have
+            log(f"File {file_id} not found in root, attempting direct download with drive_id={drive_id}")
+            target_file = {"id": file_id, "name": "downloaded_file", "drive_id": drive_id}
         
         # Download file
-        drive_id = target_file.get("drive_id", "")
+        file_drive_id = target_file.get("drive_id", "") or drive_id
         download_url = target_file.get("download_url", "")
+        filename = target_file.get("name", "downloaded_file")
+        
         local_path = filter_instance._download_sharepoint_file(
-            file_id, drive_id, target_file.get("name", ""), download_url
+            file_id, file_drive_id, filename, download_url
         )
         
         if not local_path:
@@ -2375,14 +2073,16 @@ async def import_sharepoint_file_api(request: Request):
         
         return JSONResponse(content={
             "success": True,
-            "filename": target_file.get("name"),
+            "filename": filename,
             "path": local_path,
-            "message": f"File '{target_file.get('name')}' imported successfully"
+            "message": f"File '{filename}' imported successfully"
         })
     except HTTPException:
         raise
     except Exception as e:
         log(f"Failed to import SharePoint file: {e}")
+        import traceback
+        log(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -2445,14 +2145,14 @@ async def transcribe_tool(payload: dict):
 
 @app.get("/sharepoint-browser")
 async def sharepoint_browser_page():
-    """Serve SharePoint browser HTML page."""
+    """Serve SharePoint browser HTML page with folder navigation."""
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SharePoint File Browser</title>
+    <title>SharePoint File Browser - GLChemTec</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -2480,6 +2180,42 @@ async def sharepoint_browser_page():
             color: #94a3b8;
             font-size: 14px;
         }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #1e293b;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            border: 1px solid #334155;
+        }
+        .breadcrumb-item {
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .breadcrumb-item:hover {
+            background: #334155;
+            text-decoration: underline;
+        }
+        .breadcrumb-item.current {
+            color: #fff;
+            cursor: default;
+            font-weight: 500;
+        }
+        .breadcrumb-item.current:hover {
+            background: transparent;
+            text-decoration: none;
+        }
+        .breadcrumb-separator {
+            color: #64748b;
+            font-size: 12px;
+        }
         .controls {
             display: flex;
             gap: 10px;
@@ -2497,12 +2233,18 @@ async def sharepoint_browser_page():
             font-weight: 500;
             transition: all 0.2s;
         }
-        button:hover {
+        button:hover:not(:disabled) {
             background: #2563eb;
         }
         button:disabled {
             background: #475569;
             cursor: not-allowed;
+        }
+        button.secondary {
+            background: #475569;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #64748b;
         }
         input[type="text"] {
             flex: 1;
@@ -2535,6 +2277,12 @@ async def sharepoint_browser_page():
         .file-item:hover {
             background: #334155;
         }
+        .file-item.selected {
+            background: #1e40af !important;
+        }
+        .file-item.folder-item:hover {
+            background: #3d2e0a;
+        }
         .file-item:last-child {
             border-bottom: none;
         }
@@ -2549,6 +2297,9 @@ async def sharepoint_browser_page():
             margin-right: 15px;
             font-size: 20px;
         }
+        .file-icon.folder-icon {
+            background: #78350f;
+        }
         .file-info {
             flex: 1;
         }
@@ -2559,6 +2310,15 @@ async def sharepoint_browser_page():
         .file-meta {
             font-size: 12px;
             color: #94a3b8;
+        }
+        .folder-badge {
+            background: #fbbf24;
+            color: #000;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: 600;
         }
         .loading {
             text-align: center;
@@ -2581,69 +2341,116 @@ async def sharepoint_browser_page():
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        .folder {
-            color: #fbbf24;
+        .info {
+            background: #1e3a5f;
+            border: 1px solid #1e40af;
+            color: #93c5fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
         }
-        .pdf { color: #ef4444; }
-        .doc { color: #3b82f6; }
-        .xls { color: #10b981; }
-        .img { color: #ec4899; }
+        #message {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📂 SharePoint File Browser</h1>
-            <p>Browse and import files from SharePoint for analysis</p>
+            <p>Browse folders and import files from SharePoint for analysis in OpenWebUI</p>
         </div>
         
         <div id="message"></div>
         
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item current">📁 Root</span>
+        </div>
+        
         <div class="controls">
-            <input type="text" id="searchInput" placeholder="Search files... (Press Enter)">
-            <button onclick="searchFiles()">Search</button>
-            <button onclick="listFiles()">Refresh</button>
-            <button onclick="importSelected()" id="importBtn" disabled>Import Selected</button>
+            <input type="text" id="searchInput" placeholder="Search in current folder... (Press Enter)">
+            <button onclick="searchFiles()">🔍 Search</button>
+            <button onclick="listFiles()" class="secondary">🔄 Refresh</button>
+            <button onclick="importSelected()" id="importBtn" disabled>📥 Import Selected</button>
         </div>
         
         <div class="file-list" id="fileList">
-            <div class="loading">Loading files...</div>
+            <div class="loading">Loading files from SharePoint...</div>
         </div>
     </div>
 
     <script>
         let selectedFile = null;
+        let currentFolder = '';
         const apiBase = window.location.origin;
+
+        function updateBreadcrumb() {
+            const breadcrumb = document.getElementById('breadcrumb');
+            const parts = currentFolder ? currentFolder.split('/').filter(p => p) : [];
+            
+            let html = '<span class="breadcrumb-item' + (parts.length === 0 ? ' current' : '') + '" onclick="navigateTo(\\'\\')">📁 Root</span>';
+            
+            let path = '';
+            parts.forEach((part, index) => {
+                path += (path ? '/' : '') + part;
+                const isLast = index === parts.length - 1;
+                html += '<span class="breadcrumb-separator">›</span>';
+                html += '<span class="breadcrumb-item' + (isLast ? ' current' : '') + '" ' + 
+                        (isLast ? '' : 'onclick="navigateTo(\\'' + path.replace(/'/g, "\\\\'") + '\\')"') + 
+                        '>' + part + '</span>';
+            });
+            
+            breadcrumb.innerHTML = html;
+        }
+
+        function navigateTo(folder) {
+            currentFolder = folder;
+            selectedFile = null;
+            document.getElementById('importBtn').disabled = true;
+            updateBreadcrumb();
+            listFiles();
+        }
 
         async function listFiles() {
             const fileList = document.getElementById('fileList');
             fileList.innerHTML = '<div class="loading">Loading files from SharePoint...</div>';
             
             try {
-                const response = await fetch(`${apiBase}/api/v1/sharepoint/files`, {
+                const url = currentFolder 
+                    ? `${apiBase}/api/v1/sharepoint/files?folder=${encodeURIComponent(currentFolder)}`
+                    : `${apiBase}/api/v1/sharepoint/files`;
+                    
+                const response = await fetch(url, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 
-                if (!response.ok) throw new Error('Failed to load files');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to load files');
+                }
                 
                 const data = await response.json();
                 displayFiles(data.files || []);
             } catch (error) {
                 showError('Failed to load files: ' + error.message);
-                fileList.innerHTML = '<div class="error">Error loading files. Make sure SharePoint is configured.</div>';
+                fileList.innerHTML = '<div class="error">Error loading files. ' + error.message + '</div>';
             }
         }
 
         async function searchFiles() {
             const query = document.getElementById('searchInput').value.trim();
-            if (!query) return;
+            if (!query) {
+                listFiles();
+                return;
+            }
             
             const fileList = document.getElementById('fileList');
             fileList.innerHTML = '<div class="loading">Searching...</div>';
             
             try {
-                const response = await fetch(`${apiBase}/api/v1/sharepoint/search?q=${encodeURIComponent(query)}`, {
+                const url = `${apiBase}/api/v1/sharepoint/search?q=${encodeURIComponent(query)}&folder=${encodeURIComponent(currentFolder)}`;
+                const response = await fetch(url, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -2652,6 +2459,7 @@ async def sharepoint_browser_page():
                 
                 const data = await response.json();
                 displayFiles(data.files || []);
+                showMessage(`Found ${data.files?.length || 0} results for "${query}"`, 'info');
             } catch (error) {
                 showError('Search failed: ' + error.message);
             }
@@ -2661,54 +2469,82 @@ async def sharepoint_browser_page():
             const fileList = document.getElementById('fileList');
             
             if (files.length === 0) {
-                fileList.innerHTML = '<div class="loading">No files found</div>';
+                fileList.innerHTML = '<div class="loading">📭 No files or folders found in this location</div>';
                 return;
             }
             
-            fileList.innerHTML = files.map(file => `
-                <div class="file-item" onclick="selectFile('${file.id}', '${file.name.replace(/'/g, "\\'")}')">
-                    <div class="file-icon ${getFileType(file.name)}">${getFileIcon(file.name)}</div>
-                    <div class="file-info">
-                        <div class="file-name">${file.name}</div>
-                        <div class="file-meta">${formatSize(file.size)} • ${formatDate(file.modified)}</div>
-                    </div>
-                </div>
-            `).join('');
+            fileList.innerHTML = files.map(file => {
+                const isFolder = file.is_folder;
+                const escapedName = file.name.replace(/'/g, "\\\\'");
+                const escapedPath = (file.path || file.name).replace(/'/g, "\\\\'");
+                
+                if (isFolder) {
+                    return `
+                        <div class="file-item folder-item" onclick="navigateTo('${escapedPath}')">
+                            <div class="file-icon folder-icon">📁</div>
+                            <div class="file-info">
+                                <div class="file-name">${file.name}<span class="folder-badge">FOLDER</span></div>
+                                <div class="file-meta">${file.child_count || 0} items • Click to open</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="file-item" onclick="selectFile('${file.id}', '${escapedName}', '${file.drive_id || ''}', this)">
+                            <div class="file-icon">${getFileIcon(file.name)}</div>
+                            <div class="file-info">
+                                <div class="file-name">${file.name}</div>
+                                <div class="file-meta">${formatSize(file.size)} • ${formatDate(file.modified)}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
         }
 
-        function selectFile(id, name) {
-            selectedFile = { id, name };
+        function selectFile(id, name, driveId, element) {
+            selectedFile = { id, name, drive_id: driveId };
             document.getElementById('importBtn').disabled = false;
             
             // Highlight selected
             document.querySelectorAll('.file-item').forEach(item => {
-                item.style.background = '';
+                item.classList.remove('selected');
             });
-            event.currentTarget.style.background = '#1e40af';
+            element.classList.add('selected');
         }
 
         async function importSelected() {
             if (!selectedFile) return;
             
-            showMessage('Importing file...', 'loading');
+            showMessage('📥 Importing file...', 'info');
+            document.getElementById('importBtn').disabled = true;
             
             try {
                 const response = await fetch(`${apiBase}/api/v1/sharepoint/import`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_id: selectedFile.id })
+                    body: JSON.stringify({ 
+                        file_id: selectedFile.id,
+                        drive_id: selectedFile.drive_id
+                    })
                 });
                 
-                if (!response.ok) throw new Error('Import failed');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Import failed');
+                }
                 
                 const data = await response.json();
-                showMessage(`✅ File "${selectedFile.name}" imported successfully! You can now use it in chat.`, 'success');
+                showMessage(`✅ File "${selectedFile.name}" imported successfully! You can now use it in OpenWebUI chat.`, 'success');
                 
                 // Reset selection
                 selectedFile = null;
-                document.getElementById('importBtn').disabled = true;
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
             } catch (error) {
                 showError('Failed to import file: ' + error.message);
+                document.getElementById('importBtn').disabled = false;
             }
         }
 
@@ -2717,18 +2553,13 @@ async def sharepoint_browser_page():
             if (['pdf'].includes(ext)) return '📄';
             if (['doc', 'docx'].includes(ext)) return '📝';
             if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
-            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return '🖼️';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return '🖼️';
             if (['pptx', 'ppt'].includes(ext)) return '📽️';
+            if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return '🎵';
+            if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) return '🎬';
+            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
+            if (['txt', 'md', 'json', 'xml'].includes(ext)) return '📃';
             return '📎';
-        }
-
-        function getFileType(name) {
-            const ext = name.split('.').pop()?.toLowerCase();
-            if (['pdf'].includes(ext)) return 'pdf';
-            if (['doc', 'docx'].includes(ext)) return 'doc';
-            if (['xls', 'xlsx', 'csv'].includes(ext)) return 'xls';
-            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'img';
-            return '';
         }
 
         function formatSize(bytes) {
@@ -2751,30 +2582,37 @@ async def sharepoint_browser_page():
         function showMessage(msg, type) {
             const msgDiv = document.getElementById('message');
             msgDiv.className = type;
-            msgDiv.textContent = msg;
+            msgDiv.innerHTML = msg;
             msgDiv.style.display = 'block';
-            if (type !== 'error') {
+            if (type === 'success' || type === 'info') {
                 setTimeout(() => msgDiv.style.display = 'none', 5000);
             }
         }
 
         function showError(msg) {
-            showMessage(msg, 'error');
+            showMessage('❌ ' + msg, 'error');
         }
 
         // Enter key to search
         document.getElementById('searchInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') searchFiles();
         });
+        
+        // Clear search on empty input
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            if (!e.target.value.trim()) {
+                listFiles();
+            }
+        });
 
         // Load files on page load
+        updateBreadcrumb();
         listFiles();
     </script>
 </body>
 </html>
     """
     return HTMLResponse(content=html_content)
-    return StreamingResponse(io.BytesIO(audio_bytes), media_type="audio/mpeg")
 
 
 @app.get("/v1/models")

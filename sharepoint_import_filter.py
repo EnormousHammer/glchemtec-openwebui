@@ -1,8 +1,8 @@
 """
 title: SharePoint Import Filter
 author: GLChemTec
-version: 1.0
-description: Import files from SharePoint for analysis in chat.
+version: 2.0
+description: Import files from SharePoint for analysis in chat. Browse folders dynamically.
 """
 
 import os
@@ -15,6 +15,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+# GLChemTec SharePoint Credentials
+SHAREPOINT_CLIENT_ID = "1abb5a43-1d6f-4d0e-ae95-eab2a963a4db"
+SHAREPOINT_CLIENT_SECRET = "iMq8Q~2En3-dLXCUyw706-bBU2DQ0cOPHd9Xj38dG2"
+SHAREPOINT_TENANT_ID = "fb807ad4-223e-4e42-97f7-b0029deb0e69"
+SHAREPOINT_SITE_URL = "https://glchemtecint.sharepoint.com/"
+
 
 class Filter:
     class Valves(BaseModel):
@@ -22,33 +28,35 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable SharePoint import")
         debug: bool = Field(default=True, description="Enable debug logging")
         
-        # SharePoint Configuration
+        # SharePoint Configuration - defaults to GLChemTec values
         sharepoint_site_url: str = Field(
-            default="",
-            description="SharePoint site URL (e.g., https://yourcompany.sharepoint.com/sites/YourSite)"
+            default="https://glchemtecint.sharepoint.com/",
+            description="SharePoint site URL"
         )
         sharepoint_folder: str = Field(
-            default="Documents",
-            description="Default SharePoint folder to browse"
+            default="",
+            description="Default SharePoint folder to browse (empty = root)"
         )
         enable_sharepoint: bool = Field(
-            default=False,
+            default=True,
             description="Enable SharePoint integration"
         )
 
     def __init__(self):
         try:
-            # Get SharePoint config from environment
-            sharepoint_url = os.environ.get("SHAREPOINT_SITE_URL", "")
-            sharepoint_folder = os.environ.get("SHAREPOINT_FOLDER", "Documents")
-            enable_sp = os.environ.get("ENABLE_SHAREPOINT", "false").lower() == "true"
+            # Use hardcoded GLChemTec values, with env override if needed
+            sharepoint_url = os.environ.get("SHAREPOINT_SITE_URL", SHAREPOINT_SITE_URL)
+            sharepoint_folder = os.environ.get("SHAREPOINT_FOLDER", "")
+            enable_sp = os.environ.get("ENABLE_SHAREPOINT", "true").lower() == "true"
             
             self.valves = self.Valves(
-                sharepoint_site_url=sharepoint_url or "",
+                sharepoint_site_url=sharepoint_url,
                 sharepoint_folder=sharepoint_folder,
                 enable_sharepoint=enable_sp
             )
             self._log("SharePoint import filter initialized")
+            self._log(f"Site URL: {sharepoint_url}")
+            self._log(f"SharePoint enabled: {enable_sp}")
         except Exception as e:
             print(f"[SHAREPOINT-IMPORT] ERROR in __init__: {e}")
             import traceback
@@ -94,15 +102,16 @@ class Filter:
     def _get_graph_token(self) -> Optional[str]:
         """Get Microsoft Graph API access token using Azure AD credentials."""
         try:
-            client_id = os.environ.get("SHAREPOINT_CLIENT_ID", "")
-            client_secret = os.environ.get("SHAREPOINT_CLIENT_SECRET", "")
-            tenant_id = os.environ.get("SHAREPOINT_TENANT_ID", "")
+            # Use hardcoded GLChemTec credentials, with env override if needed
+            client_id = os.environ.get("SHAREPOINT_CLIENT_ID", SHAREPOINT_CLIENT_ID)
+            client_secret = os.environ.get("SHAREPOINT_CLIENT_SECRET", SHAREPOINT_CLIENT_SECRET)
+            tenant_id = os.environ.get("SHAREPOINT_TENANT_ID", SHAREPOINT_TENANT_ID)
             
             if not all([client_id, client_secret, tenant_id]):
                 self._log("SharePoint credentials not configured")
                 return None
             
-            # Use Microsoft Graph API (v1.0) - same as glc_assistant
+            # Use Microsoft Graph API (v1.0)
             token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
             
             token_data = {
@@ -117,8 +126,8 @@ class Filter:
                 self._log(f"Token request failed: {response.status_code} - {response.text[:200]}")
                 return None
             
-            token_data = response.json()
-            return token_data.get("access_token")
+            token_resp = response.json()
+            return token_resp.get("access_token")
             
         except Exception as e:
             self._log(f"Error getting Graph API token: {e}")
@@ -126,22 +135,19 @@ class Filter:
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
 
-    def _list_sharepoint_files(self, folder_path: str = None) -> List[Dict[str, Any]]:
-        """List files in SharePoint using Microsoft Graph API (matching glc_assistant implementation)."""
+    def _get_site_and_drive_info(self) -> Optional[Dict[str, Any]]:
+        """Get SharePoint site ID and drive ID for API calls."""
         try:
             token = self._get_graph_token()
             if not token:
-                return []
+                return None
             
-            # Use Microsoft Graph API - same approach as glc_assistant
-            # First, get the site ID from the site URL
             site_url = self.valves.sharepoint_site_url
             if not site_url:
                 self._log("SharePoint site URL not configured")
-                return []
+                return None
             
             # Extract site hostname and path
-            # Format: https://tenant.sharepoint.com/sites/SiteName
             site_host = site_url.split("//")[1].split("/")[0] if "//" in site_url else ""
             site_path = "/" + "/".join(site_url.split("//")[1].split("/")[1:]) if "//" in site_url else ""
             
@@ -150,20 +156,20 @@ class Filter:
                 "Accept": "application/json"
             }
             
-            # Get site by hostname and path (Graph API)
+            # Get site by hostname and path
             site_api_url = f"https://graph.microsoft.com/v1.0/sites/{site_host}:{site_path}"
             site_response = requests.get(site_api_url, headers=headers, timeout=15)
             
             if site_response.status_code != 200:
                 self._log(f"Failed to get site: {site_response.status_code}")
-                return []
+                return None
             
             site_data = site_response.json()
             site_id = site_data.get("id")
             
             if not site_id:
                 self._log("Failed to get site ID")
-                return []
+                return None
             
             # Get default document library (drive)
             drives_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
@@ -171,79 +177,101 @@ class Filter:
             
             if drives_response.status_code != 200:
                 self._log(f"Failed to get drives: {drives_response.status_code}")
-                return []
+                return None
             
             drives_data = drives_response.json()
             drives = drives_data.get("value", [])
             
             if not drives:
                 self._log("No document libraries found")
-                return []
+                return None
             
-            # Use first drive (default document library)
             drive_id = drives[0].get("id")
             
-            # Build folder path
-            folder = folder_path or self.valves.sharepoint_folder
-            folder = folder.strip("/")
+            return {
+                "token": token,
+                "site_id": site_id,
+                "drive_id": drive_id,
+                "headers": headers
+            }
+        except Exception as e:
+            self._log(f"Error getting site/drive info: {e}")
+            return None
+
+    def _list_sharepoint_items(self, folder_path: str = None, include_folders: bool = True) -> List[Dict[str, Any]]:
+        """List files AND folders in SharePoint for navigation."""
+        try:
+            info = self._get_site_and_drive_info()
+            if not info:
+                return []
             
-            # Get items from drive root or specific folder
+            drive_id = info["drive_id"]
+            headers = info["headers"]
+            
+            # Build folder path - use provided path or default
+            folder = folder_path.strip("/") if folder_path else ""
+            
+            # Get items from drive root or specific folder path
             if folder:
-                # Search for folder first
-                search_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
-                items_response = requests.get(search_url, headers=headers, timeout=15)
-                
-                if items_response.status_code == 200:
-                    items_data = items_response.json()
-                    items = items_data.get("value", [])
-                    
-                    # Find the folder
-                    folder_item = None
-                    for item in items:
-                        if item.get("name") == folder and item.get("folder"):
-                            folder_item = item
-                            break
-                    
-                    if folder_item:
-                        folder_id = folder_item.get("id")
-                        items_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}/children"
-                    else:
-                        items_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
-                else:
-                    items_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
+                # Use path-based access for nested folders
+                items_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{folder}:/children"
             else:
                 items_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
             
-            # Get files
+            self._log(f"Listing items from: {items_url}")
+            
             files_response = requests.get(items_url, headers=headers, timeout=15)
             if files_response.status_code != 200:
-                self._log(f"Failed to list files: {files_response.status_code}")
+                self._log(f"Failed to list items: {files_response.status_code} - {files_response.text[:200]}")
                 return []
             
             files_data = files_response.json()
             items = files_data.get("value", [])
             
-            files = []
+            result = []
             for item in items:
-                if not item.get("folder"):  # Only files, not folders
-                    files.append({
-                        "id": item.get("id"),
-                        "name": item.get("name", ""),
-                        "size": item.get("size", 0),
-                        "download_url": item.get("@microsoft.graph.downloadUrl", ""),
-                        "web_url": item.get("webUrl", ""),
-                        "modified": item.get("lastModifiedDateTime", ""),
-                        "mime_type": item.get("file", {}).get("mimeType", "") if item.get("file") else ""
-                    })
+                is_folder = item.get("folder") is not None
+                
+                # Skip folders if not requested
+                if is_folder and not include_folders:
+                    continue
+                
+                item_data = {
+                    "id": item.get("id"),
+                    "name": item.get("name", ""),
+                    "size": item.get("size", 0),
+                    "download_url": item.get("@microsoft.graph.downloadUrl", ""),
+                    "web_url": item.get("webUrl", ""),
+                    "modified": item.get("lastModifiedDateTime", ""),
+                    "is_folder": is_folder,
+                    "drive_id": drive_id,
+                    "path": f"{folder}/{item.get('name', '')}" if folder else item.get("name", "")
+                }
+                
+                if not is_folder:
+                    item_data["mime_type"] = item.get("file", {}).get("mimeType", "") if item.get("file") else ""
+                else:
+                    item_data["child_count"] = item.get("folder", {}).get("childCount", 0)
+                
+                result.append(item_data)
             
-            self._log(f"Found {len(files)} files in SharePoint (Graph API)")
-            return files
+            # Sort: folders first, then files
+            result.sort(key=lambda x: (0 if x.get("is_folder") else 1, x.get("name", "").lower()))
+            
+            self._log(f"Found {len(result)} items in SharePoint folder '{folder or 'root'}'")
+            return result
             
         except Exception as e:
-            self._log(f"Error listing SharePoint files: {e}")
+            self._log(f"Error listing SharePoint items: {e}")
             import traceback
             self._log(f"Traceback: {traceback.format_exc()}")
             return []
+
+    def _list_sharepoint_files(self, folder_path: str = None) -> List[Dict[str, Any]]:
+        """List files in SharePoint using Microsoft Graph API (matching glc_assistant implementation)."""
+        # Use the new method but filter out folders for backward compatibility
+        items = self._list_sharepoint_items(folder_path, include_folders=False)
+        return [item for item in items if not item.get("is_folder")]
 
     def _download_sharepoint_file(self, file_id: str, drive_id: str, filename: str, download_url: str = None) -> Optional[str]:
         """Download file from SharePoint using Microsoft Graph API (matching glc_assistant implementation)."""

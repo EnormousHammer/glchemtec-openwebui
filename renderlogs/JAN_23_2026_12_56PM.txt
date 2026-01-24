@@ -1,0 +1,252 @@
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/ clientIP="67.208.31.165" requestID="c2bd731d-b4e3-42cc" responseTimeMS=28 responseBytes=2448 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/2d462341-231d-4710-945f-af92b457e405/profile/image clientIP="67.208.31.165" requestID="dbdecfcc-4ae1-4ea7" responseTimeMS=9 responseBytes=8150 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/favicon.png clientIP="67.208.31.165" requestID="496ea59d-4540-4629" responseTimeMS=4 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/ clientIP="67.208.31.165" requestID="fea628f6-4c02-44ba" responseTimeMS=7 responseBytes=2448 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/models/model/profile/image?id=gl---ai-agent-prompt-v1&lang=en-US clientIP="67.208.31.165" requestID="828c1aad-279d-46a1" responseTimeMS=51 responseBytes=11160 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="67.208.31.165" requestID="96a5f462-a57b-4099" responseTimeMS=7 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/models/model/profile/image?id=undefined&lang=en-US clientIP="67.208.31.165" requestID="4fe10b9a-6677-4a6a" responseTimeMS=15 responseBytes=10948 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:52:08.316 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/users/2d462341-231d-4710-945f-af92b457e405/profile/image HTTP/1.1" 200
+2026-01-23 17:52:08.355 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/functions/ HTTP/1.1" 200
+2026-01-23 17:52:08.404 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/models/model/profile/image?id=gl---ai-agent-prompt-v1&lang=en-US HTTP/1.1" 200
+2026-01-23 17:52:08.422 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/models/model/profile/image?id=undefined&lang=en-US HTTP/1.1" 200
+2026-01-23 17:52:08.436 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/tools/ HTTP/1.1" 200
+2026-01-23 17:52:08.505 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /static/favicon.png HTTP/1.1" 304
+2026-01-23 17:52:08.553 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/functions/ HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="67.208.31.165" requestID="462ba1c3-58b6-4063" responseTimeMS=6 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:52:12.441 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /_app/version.json HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="67.208.31.165" requestID="69cf4a8b-a0fe-4053" responseTimeMS=6 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:53:12.479 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /_app/version.json HTTP/1.1" 200
+2026-01-23 17:53:26.010 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:53:26.010 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:53:26.021 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:53:26.025 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+[GET]
+glchemtec-openwebui.onrender.com/api/models? clientIP="67.208.31.165" requestID="987fbd21-022f-4be9" responseTimeMS=1886 responseBytes=1241 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:53:27.885 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/models HTTP/1.1" 200
+2026-01-23 17:53:27.989 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:53:27.993 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:53:27.997 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+[GET]
+glchemtec-openwebui.onrender.com/api/models? clientIP="67.208.31.165" requestID="7663fd4c-c68b-4f1c" responseTimeMS=32 responseBytes=1241 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:53:28.013 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/models HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="67.208.31.165" requestID="866d07d2-ae8f-4ce0" responseTimeMS=6 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:54:12.473 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /_app/version.json HTTP/1.1" 200
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/files/?process=true clientIP="67.208.31.165" requestID="59574953-e299-4037" responseTimeMS=478 responseBytes=685 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:54:28.576 | INFO     | open_webui.routers.files:upload_file_handler:225 - file.content_type: application/vnd.openxmlformats-officedocument.presentationml.presentation True
+2026-01-23 17:54:28.598 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/v1/files/?process=true HTTP/1.1" 200
+2026-01-23 17:54:28.705 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/files/f13d1606-bd06-42cb-9981-d1d68e516359/process/status?stream=true HTTP/1.1" 200
+2026-01-23 17:54:30.558 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1425 - Using markdown header text splitter
+2026-01-23 17:54:30.644 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1509 - generating embeddings for file-f13d1606-bd06-42cb-9981-d1d68e516359
+
+Batches:   0%|          | 0/5 [00:00<?, ?it/s]
+Batches:  20%|██        | 1/5 [00:01<00:04,  1.02s/it]
+Batches:  40%|████      | 2/5 [00:01<00:01,  1.70it/s]
+Batches:  60%|██████    | 3/5 [00:01<00:00,  2.00it/s]
+Batches:  80%|████████  | 4/5 [00:02<00:00,  2.37it/s]
+Batches: 100%|██████████| 5/5 [00:02<00:00,  2.65it/s]
+Batches: 100%|██████████| 5/5 [00:02<00:00,  2.18it/s]
+2026-01-23 17:54:32.956 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1549 - embeddings generated 5 for 5 items
+2026-01-23 17:54:32.956 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1561 - adding to collection file-f13d1606-bd06-42cb-9981-d1d68e516359
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/files/f13d1606-bd06-42cb-9981-d1d68e516359/process/status?stream=true clientIP="67.208.31.165" requestID="12eefde3-183a-410d" responseTimeMS=5066 responseBytes=359 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:54:33.136 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1567 - added 5 items to collection file-f13d1606-bd06-42cb-9981-d1d68e516359
+2026-01-23 17:54:33.136 | INFO     | open_webui.routers.retrieval:process_file:1762 - added 1 items to collection file-f13d1606-bd06-42cb-9981-d1d68e516359
+2026-01-23 17:54:35.835 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/v1/chats/new HTTP/1.1" 200
+2026-01-23 17:54:35.901 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/tools/ HTTP/1.1" 200
+2026-01-23 17:54:35.978 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:54:36.097 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 HTTP/1.1" 200
+2026-01-23 17:54:36.212 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:54:36.347 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-23 17:54:36.351 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_pubchem_look_up
+[SHAREPOINT-IMPORT] Inlet called
+[SHAREPOINT-IMPORT] Filter disabled or SharePoint not enabled, skipping
+[PPT-PDF-VISION] ============================================================
+[PPT-PDF-VISION] INLET - PPT/PDF Vision Filter v8.0
+[PPT-PDF-VISION] Using built-in PPTX extraction (no external service)
+[PPT-PDF-VISION] Body keys: ['stream', 'model', 'messages', 'files', 'features', 'stream_options', 'metadata']
+[PPT-PDF-VISION] Found 1 files in body['files']
+[PPT-PDF-VISION] Total unique files found: 1
+[PPT-PDF-VISION] Model: gl---ai-agent-prompt-v1, Format: OpenAI
+[PPT-PDF-VISION] Processing file: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] File path: /app/backend/data/uploads/f13d1606-bd06-42cb-9981-d1d68e516359_GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] Processing PPTX file (built-in extraction)
+[PPT-PDF-VISION] Extracting PPTX locally: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] Slide 1: Extracted image - 73KB, image/jpeg, FULL QUALITY (no compression)
+[PPT-PDF-VISION] Slide 1: Extracted image - 41KB, image/png, FULL QUALITY (no compression)
+[PPT-PDF-VISION] Slide 1: Extracted image - 53KB, image/png, FULL QUALITY (no compression)
+[PPT-PDF-VISION] Local PPTX extraction error: ValueError: shape does not contain a table
+[PPT-PDF-VISION] Traceback: Traceback (most recent call last):
+  File "<string>", line 240, in extract_pptx_locally
+  File "/usr/local/lib/python3.11/site-packages/pptx/shapes/graphfrm.py", line 128, in table
+    raise ValueError("shape does not contain a table")
+ValueError: shape does not contain a table
+[PPT-PDF-VISION] PPTX extraction failed - attempting fallback extraction
+[PPT-PDF-VISION] Attempting fallback extraction using python-pptx for glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
+[PPT-PDF-VISION] Slide 1: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 1: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 1: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 1: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 1: Extracted image (74988 bytes, image/jpeg)
+[PPT-PDF-VISION] Slide 1: Extracted image (42111 bytes, image/png)
+[PPT-PDF-VISION] Slide 1: Extracted image (54918 bytes, image/png)
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape is not an auto shape
+[PPT-PDF-VISION] Slide 2: Error in _extract_text_from_shape: shape does not contain a table
+[PPT-PDF-VISION] Fallback extraction failed: ValueError: shape does not contain a table
+[PPT-PDF-VISION] Traceback: Traceback (most recent call last):
+  File "<string>", line 619, in extract_pptx_fallback
+  File "/usr/local/lib/python3.11/site-packages/pptx/shapes/graphfrm.py", line 128, in table
+    raise ValueError("shape does not contain a table")
+ValueError: shape does not contain a table
+[PPT-PDF-VISION] Both primary and fallback extraction failed - no content available
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="0eeb0330-4aaa-4169" responseTimeMS=9 responseBytes=891 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/new clientIP="67.208.31.165" requestID="461c0201-91f3-4516" responseTimeMS=23 responseBytes=1047 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="67.208.31.165" requestID="bddb5822-30a8-49d9" responseTimeMS=9 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 clientIP="67.208.31.165" requestID="e9b4e3f3-0e31-441d" responseTimeMS=20 responseBytes=1146 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="3da98b8f-ff32-42ed" responseTimeMS=11 responseBytes=893 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="44a5b043-49c8-47c4" responseTimeMS=12 responseBytes=893 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/chat/completions clientIP="67.208.31.165" requestID="074d336d-0d08-45cd" responseTimeMS=211 responseBytes=399 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[PPT-PDF-VISION] 📤 Building message to send to OpenAI:
+[PPT-PDF-VISION]    - 1 text sections (includes tables, text, notes)
+[PPT-PDF-VISION]    - 0 images (will be sent as input_image to OpenAI)
+[PPT-PDF-VISION]    - Total text size: 0KB (includes tables)
+[PPT-PDF-VISION] ✅ Cleaned 0 images (from 0 total)
+[PPT-PDF-VISION] ✅ SUCCESS - Message ready to send to OpenAI:
+[PPT-PDF-VISION]    - 1 text blocks (includes ALL tables, text, notes)
+[PPT-PDF-VISION]    - 0 images (as input_image - OpenAI WILL receive these)
+[PPT-PDF-VISION]    - All content will be sent via Responses API to OpenAI
+[PPT-PDF-VISION] ============================================================
+[EXPORT-FILTER] Inlet called
+2026-01-23 17:54:36.524 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:54:36.525 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/chat/completions HTTP/1.1" 200
+2026-01-23 17:54:36.650 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+
+Batches:   0%|          | 0/3 [00:00<?, ?it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00, 18.59it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00, 18.54it/s]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', 'f2fb2a03-a9e5-464c-8418-8396b0102144', 'ec68c764-ed07-4ddc-89ff-6978d5509dc6']] [[{'start_index': 0, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'start_index': 681, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}"}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 3260, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}]]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', 'ec68c764-ed07-4ddc-89ff-6978d5509dc6', 'f2fb2a03-a9e5-464c-8418-8396b0102144']] [[{'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 0, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}"}, {'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 3260, 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 681}]]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', '4e686431-36aa-447a-a40e-42be8c283e00', 'aa78546e-2a3d-4ed6-8311-701c830167a7']] [[{'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 0, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'start_index': 2514, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 1594, 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'created_by': '2d462341-231d-4710-945f-af92b457e405'}]]
+2026-01-23 17:54:39.881 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="67.208.31.165" requestID="8e6f538d-29f5-4b65" responseTimeMS=6 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:12.556 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /_app/version.json HTTP/1.1" 200
+[POST]
+glchemtec-openwebui.onrender.com/api/chat/completed clientIP="67.208.31.165" requestID="211fe4b0-c2ef-4c89" responseTimeMS=23 responseBytes=5117 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:15.691 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[EXPORT-FILTER] Outlet called
+2026-01-23 17:55:15.987 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/chat/completed HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="a77a8250-2838-460d" responseTimeMS=8 responseBytes=890 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 clientIP="67.208.31.165" requestID="ac5d641d-b5d2-4c35" responseTimeMS=28 responseBytes=5621 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:16.168 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 HTTP/1.1" 200
+2026-01-23 17:55:16.274 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:55:21.843 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="193c45a1-484d-475a" responseTimeMS=10 responseBytes=923 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/models? clientIP="67.208.31.165" requestID="0833f78b-ebb4-4401" responseTimeMS=310 responseBytes=1238 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:24.196 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:24.309 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:55:24.414 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:24.414 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:55:24.425 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:24.431 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:24.714 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/models HTTP/1.1" 200
+2026-01-23 17:55:26.063 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:26.064 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:55:26.078 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:26.089 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+
+PPT-PDF-VISION] ✅ SUCCESS - Message ready to send to OpenAI:
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/new clientIP="67.208.31.165" requestID="461c0201-91f3-4516" responseTimeMS=23 responseBytes=1047 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="0eeb0330-4aaa-4169" responseTimeMS=9 responseBytes=891 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="67.208.31.165" requestID="bddb5822-30a8-49d9" responseTimeMS=9 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="44a5b043-49c8-47c4" responseTimeMS=12 responseBytes=893 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 clientIP="67.208.31.165" requestID="e9b4e3f3-0e31-441d" responseTimeMS=20 responseBytes=1146 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="3da98b8f-ff32-42ed" responseTimeMS=11 responseBytes=893 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/chat/completions clientIP="67.208.31.165" requestID="074d336d-0d08-45cd" responseTimeMS=211 responseBytes=399 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[PPT-PDF-VISION]    - 1 text blocks (includes ALL tables, text, notes)
+[PPT-PDF-VISION]    - 0 images (as input_image - OpenAI WILL receive these)
+[PPT-PDF-VISION]    - All content will be sent via Responses API to OpenAI
+[PPT-PDF-VISION] ============================================================
+[EXPORT-FILTER] Inlet called
+2026-01-23 17:54:36.524 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:54:36.525 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/chat/completions HTTP/1.1" 200
+2026-01-23 17:54:36.650 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+
+Batches:   0%|          | 0/3 [00:00<?, ?it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00, 18.59it/s]
+Batches: 100%|██████████| 3/3 [00:00<00:00, 18.54it/s]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', 'f2fb2a03-a9e5-464c-8418-8396b0102144', 'ec68c764-ed07-4ddc-89ff-6978d5509dc6']] [[{'start_index': 0, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'start_index': 681, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}"}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 3260, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}]]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', 'ec68c764-ed07-4ddc-89ff-6978d5509dc6', 'f2fb2a03-a9e5-464c-8418-8396b0102144']] [[{'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 0, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}"}, {'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 3260, 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 681}]]
+2026-01-23 17:54:39.869 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['28292733-d983-4454-86d6-e09d0915d2fc', '4e686431-36aa-447a-a40e-42be8c283e00', 'aa78546e-2a3d-4ed6-8311-701c830167a7']] [[{'created_by': '2d462341-231d-4710-945f-af92b457e405', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 0, 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'start_index': 2514, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 1594, 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': 'f13d1606-bd06-42cb-9981-d1d68e516359', 'created_by': '2d462341-231d-4710-945f-af92b457e405'}]]
+2026-01-23 17:54:39.881 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="67.208.31.165" requestID="8e6f538d-29f5-4b65" responseTimeMS=6 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:12.556 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /_app/version.json HTTP/1.1" 200
+[POST]
+glchemtec-openwebui.onrender.com/api/chat/completed clientIP="67.208.31.165" requestID="211fe4b0-c2ef-4c89" responseTimeMS=23 responseBytes=5117 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:15.691 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[EXPORT-FILTER] Outlet called
+2026-01-23 17:55:15.987 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/chat/completed HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="a77a8250-2838-460d" responseTimeMS=8 responseBytes=890 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[POST]
+glchemtec-openwebui.onrender.com/api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 clientIP="67.208.31.165" requestID="ac5d641d-b5d2-4c35" responseTimeMS=28 responseBytes=5621 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:16.168 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "POST /api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 HTTP/1.1" 200
+2026-01-23 17:55:16.274 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:55:21.843 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+[GET]
+glchemtec-openwebui.onrender.com/api/models? clientIP="67.208.31.165" requestID="0833f78b-ebb4-4401" responseTimeMS=310 responseBytes=1238 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="67.208.31.165" requestID="193c45a1-484d-475a" responseTimeMS=10 responseBytes=923 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:24.196 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:24.309 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-23 17:55:24.414 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:24.414 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:55:24.425 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:24.431 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:24.714 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/models HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/models? clientIP="67.208.31.165" requestID="1579569b-2ca1-4944" responseTimeMS=777 responseBytes=1238 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/all/tags clientIP="67.208.31.165" requestID="c062de5f-54db-4bfe" responseTimeMS=6 responseBytes=606 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 clientIP="67.208.31.165" requestID="efd6dbc1-7597-48b8" responseTimeMS=9 responseBytes=5774 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-23 17:55:26.063 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-23 17:55:26.064 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+2026-01-23 17:55:26.078 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:26.089 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-23 17:55:26.476 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/c04da30b-b857-4ed0-9c39-4131b1645151 HTTP/1.1" 200
+2026-01-23 17:55:26.581 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/v1/chats/all/tags HTTP/1.1" 200
+2026-01-23 17:55:26.830 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 67.208.31.165:0 - "GET /api/models HTTP/1.1" 200
