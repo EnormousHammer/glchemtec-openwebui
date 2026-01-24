@@ -51,6 +51,7 @@ COPY ppt_pdf_filter.py /app/backend/custom/filters/ppt_pdf_filter.py
 COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY start.sh /app/start.sh
+COPY set_default_connection.py /app/set_default_connection.py
 
 # Modify OpenWebUI's startup script to start proxy first
 RUN if [ -f /app/backend/start.sh ]; then \
@@ -68,6 +69,8 @@ RUN if [ -f /app/backend/start.sh ]; then \
     echo 'else' >> /app/backend/start.sh && \
     echo '  echo "✓ Proxy is running (PID: $PROXY_PID)"' >> /app/backend/start.sh && \
     echo 'fi' >> /app/backend/start.sh && \
+    echo 'echo "=== Setting default OpenAI connection ==="' >> /app/backend/start.sh && \
+    echo 'python3 /app/set_default_connection.py 2>&1 || true' >> /app/backend/start.sh && \
     echo 'echo "=== Starting OpenWebUI ==="' >> /app/backend/start.sh && \
     echo 'exec bash /app/backend/start.sh.original "$@"' >> /app/backend/start.sh && \
     chmod +x /app/backend/start.sh; \
@@ -86,7 +89,8 @@ RUN mkdir -p /home/user/nltk_data && \
     chmod -R 777 /tmp/libreoffice && \
     chmod -R 755 /app/backend && \
     chmod +x /app/openai_responses_proxy.py && \
-    chmod +x /app/start.sh
+    chmod +x /app/start.sh && \
+    chmod +x /app/set_default_connection.py
 
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt', download_dir='/home/user/nltk_data'); nltk.download('averaged_perceptron_tagger', download_dir='/home/user/nltk_data'); nltk.download('stopwords', download_dir='/home/user/nltk_data')" || true
