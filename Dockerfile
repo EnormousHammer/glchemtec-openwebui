@@ -55,30 +55,11 @@ COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 
 # Modify OpenWebUI's startup script to start proxy first
-# Create the modified startup script using a heredoc for reliability
+# Use printf instead of heredoc - more reliable in Dockerfile RUN commands
 RUN set -e && \
     if [ -f /app/backend/start.sh ]; then \
         cp /app/backend/start.sh /app/backend/start.sh.original && \
-        cat > /app/backend/start.sh << 'EOFSCRIPT' && \
-#!/bin/bash
-set -e
-cd /app
-echo "=== Starting OpenAI Responses Proxy ==="
-python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &
-PROXY_PID=$!
-echo "Proxy started with PID: $PROXY_PID"
-sleep 3
-if ! kill -0 $PROXY_PID 2>/dev/null; then
-  echo "ERROR: Proxy process died immediately!"
-  wait $PROXY_PID 2>/dev/null || true
-  exit 1
-else
-  echo "✓ Proxy is running (PID: $PROXY_PID)"
-fi
-echo "=== Starting OpenWebUI ==="
-python3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &
-exec bash /app/backend/start.sh.original "$@"
-EOFSCRIPT
+        printf '#!/bin/bash\nset -e\ncd /app\necho "=== Starting OpenAI Responses Proxy ==="\npython3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &\nPROXY_PID=$!\necho "Proxy started with PID: $PROXY_PID"\nsleep 3\nif ! kill -0 $PROXY_PID 2>/dev/null; then\n  echo "ERROR: Proxy process died immediately!"\n  wait $PROXY_PID 2>/dev/null || true\n  exit 1\nelse\n  echo "✓ Proxy is running (PID: $PROXY_PID)"\nfi\necho "=== Starting OpenWebUI ==="\npython3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &\nexec bash /app/backend/start.sh.original "$@"\n' > /app/backend/start.sh && \
         chmod +x /app/backend/start.sh && \
         echo "✓ Successfully modified /app/backend/start.sh"; \
     else \
