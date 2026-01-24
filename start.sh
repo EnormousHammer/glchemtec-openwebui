@@ -35,6 +35,22 @@ echo "=== Starting OpenWebUI ===" >&2
 echo "PORT will be: ${PORT:-8080}" >&2
 echo "OpenWebUI start script: /app/backend/start.sh" >&2
 
+# Enforce GLChemTec branding assets and custom CSS at runtime (handles persisted volumes)
+echo "Applying GLChemTec branding theme..." >&2
+mkdir -p /app/backend/data/static /app/backend/open_webui/static /app/backend/open_webui/static/css
+if [ -f "/app/backend/open_webui/static/branding/glc-theme.css" ]; then
+  cp /app/backend/open_webui/static/branding/glc-theme.css /app/backend/data/static/custom.css 2>/dev/null || true
+  cp /app/backend/open_webui/static/branding/glc-theme.css /app/backend/open_webui/static/custom.css 2>/dev/null || true
+  cp /app/backend/open_webui/static/branding/glc-theme.css /app/backend/open_webui/static/css/custom.css 2>/dev/null || true
+fi
+if [ -f "/app/backend/open_webui/static/branding/GLC_icon.png" ]; then
+  cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico 2>/dev/null || true
+  cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.png 2>/dev/null || true
+fi
+if [ -f "/app/backend/open_webui/static/branding/GLC_Logo.png" ]; then
+  cp /app/backend/open_webui/static/branding/GLC_Logo.png /app/backend/open_webui/static/logo.png 2>/dev/null || true
+fi
+
 # Check if start script exists
 if [ ! -f "/app/backend/start.sh" ]; then
     echo "ERROR: /app/backend/start.sh not found!"
