@@ -37,36 +37,22 @@ def enforce_connection():
             "models": []
         })
         
-        # Check current connection
-        cursor.execute("SELECT id, base_url FROM connection WHERE type = 'openai' LIMIT 1")
-        row = cursor.fetchone()
+        # Delete ALL OpenAI connections first (prevents duplicates/resets)
+        cursor.execute("DELETE FROM connection WHERE type = 'openai'")
+        deleted = cursor.rowcount
+        if deleted > 0:
+            print(f"[CONFIG] Removed {deleted} existing OpenAI connection(s) to prevent conflicts")
         
-        if row:
-            conn_id, current_url = row
-            if current_url != PROXY_URL:
-                # Connection was reset - fix it immediately
-                cursor.execute(
-                    "UPDATE connection SET data = ?, base_url = ? WHERE id = ?",
-                    (connection_data, PROXY_URL, conn_id)
-                )
-                conn.commit()
-                print(f"[CONFIG] ⚠️ Connection was reset to '{current_url}' - FIXED to: {PROXY_URL}")
-                conn.close()
-                return True
-            # Already correct, no action needed
-            conn.close()
-            return True
-        else:
-            # No connection exists - create it
-            import uuid
-            cursor.execute(
-                "INSERT INTO connection (id, name, type, data, base_url) VALUES (?, ?, ?, ?, ?)",
-                (str(uuid.uuid4()), "OpenAI (Proxy)", "openai", connection_data, PROXY_URL)
-            )
-            conn.commit()
-            print(f"[CONFIG] Created OpenAI connection: {PROXY_URL}")
-            conn.close()
-            return True
+        # Create the correct connection
+        import uuid
+        cursor.execute(
+            "INSERT INTO connection (id, name, type, data, base_url) VALUES (?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), "OpenAI (Proxy)", "openai", connection_data, PROXY_URL)
+        )
+        conn.commit()
+        print(f"[CONFIG] ✅ Connection enforced: {PROXY_URL}")
+        conn.close()
+        return True
         
     except Exception as e:
         print(f"[CONFIG] Error: {e}", file=sys.stderr)
