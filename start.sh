@@ -96,6 +96,21 @@ cp /tmp/glc-theme.css /app/backend/open_webui/static/custom.css 2>/dev/null || t
 cp /tmp/glc-theme.css /app/backend/open_webui/static/css/custom.css 2>/dev/null || true
 cp /tmp/glc-theme.css /app/backend/static/custom.css 2>/dev/null || true
 cp /tmp/glc-theme.css /app/backend/static/css/custom.css 2>/dev/null || true
+# Ensure custom.js exists to inject theme if custom.css not auto-loaded
+cat > /app/backend/open_webui/static/custom.js <<'EOF'
+(function () {
+  const id = "glc-theme-injector";
+  if (document.getElementById(id)) return;
+  const href = "/static/css/custom.css?v=glc1";
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.type = "text/css";
+  link.href = href;
+  document.head.appendChild(link);
+})();
+EOF
+cp /app/backend/open_webui/static/custom.js /app/backend/data/static/custom.js 2>/dev/null || true
 
 if [ -f "/app/backend/open_webui/static/branding/GLC_icon.png" ]; then
   cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico 2>/dev/null || true

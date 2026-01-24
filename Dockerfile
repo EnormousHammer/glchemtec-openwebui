@@ -61,6 +61,9 @@ COPY public/branding/glc-theme.css /app/backend/static/custom.css
 COPY public/branding/glc-theme.css /app/backend/static/css/custom.css
 # Also place theme in data static override (if mounted)
 COPY public/branding/glc-theme.css /app/backend/data/static/custom.css
+# Inject fallback custom.js to force-load theme if custom.css is skipped
+COPY public/branding/custom.js /app/backend/open_webui/static/custom.js
+COPY public/branding/custom.js /app/backend/data/static/custom.js
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
