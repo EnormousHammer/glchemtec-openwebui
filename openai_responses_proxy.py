@@ -1328,15 +1328,13 @@ async def chat_completions(request: Request):
     augmented_text = all_text
     if nmr_image:
         nmr_prompt = (
-            "\n\n[INSTRUCTION FOR NMR IMAGES - HIGH PRIORITY]\n"
-            "- If any attached image is an NMR spectrum, carefully examine the image at FULL RESOLUTION.\n"
-            "- Extract ALL visible peak data: δ (ppm), multiplicity, integration, J (Hz) if visible, assignment if clear.\n"
-            "- Read axis labels carefully - they may be small but are critical for interpretation.\n"
-            "- For spectra with unreadable labels, describe what you CAN see (peaks, patterns, regions) and note what is unclear.\n"
-            "- Then generate an ACS-style summary (Journal of Organic Chemistry style) with proper nuclei symbols and δ notation.\n"
-            "- State nucleus (¹H or ¹³C) inferred from axis/labels; if unclear, note the uncertainty.\n"
-            "- If image is not an NMR spectrum, say it is not an NMR spectrum.\n"
-            "- IMPORTANT: All images are sent at FULL QUALITY - examine them carefully for small text and fine details.\n"
+            "\n\n[INSTRUCTION FOR SPECTRA - HIGH PRIORITY]\n"
+            "- If an image is a spectrum (NMR/HPLC/LCMS), read at FULL RESOLUTION.\n"
+            "- Output should be concise: first a peak table, then a brief ACS-style summary.\n"
+            "- Peak table: include δ/RT/mz, multiplicity (if NMR), integration/area/intensity, J (Hz) if shown, assignment if clear.\n"
+            "- Summary: 1–3 sentences, Journal of Organic Chemistry style; state nucleus (¹H/¹³C) if known, otherwise note uncertainty.\n"
+            "- If labels are unreadable, say so and report only what is visible.\n"
+            "- If an image is not a spectrum, simply say it is not a spectrum.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
