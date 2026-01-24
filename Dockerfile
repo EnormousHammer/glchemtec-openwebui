@@ -56,6 +56,8 @@ COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-t
 # Expose theme as custom.css in both static roots (cache-safe)
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/custom.css
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/css/custom.css
+# Also place theme in data static override (if mounted)
+COPY public/branding/glc-theme.css /app/backend/data/static/custom.css
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
