@@ -42,7 +42,7 @@ class Filter:
 
         # PPTX pipeline
         render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
-        libreoffice_timeout_sec: int = Field(default=240, description="LibreOffice timeout (sec)")
+        libreoffice_timeout_sec: int = Field(default=60, description="LibreOffice timeout (sec)")
 
         # Include PPTX extracted text/tables (helpful for copyable content)
         include_pptx_text: bool = Field(default=True, description="Extract slide text/tables via python-pptx (if available)")
@@ -147,7 +147,7 @@ class Filter:
                 "--outdir", out_dir,
                 ppt_path,
             ]
-            self._log(f"Running LibreOffice PPTX->PDF: {os.path.basename(ppt_path)}")
+            self._log(f"Running LibreOffice PPTX->PDF: {os.path.basename(ppt_path)} (timeout: {self.valves.libreoffice_timeout_sec}s)")
             r = subprocess.run(
                 cmd,
                 timeout=self.valves.libreoffice_timeout_sec,
@@ -155,6 +155,7 @@ class Filter:
                 text=True,
                 env=env,
             )
+            self._log(f"LibreOffice conversion completed (returncode: {r.returncode})")
             if r.returncode != 0:
                 self._log(f"LibreOffice returned {r.returncode}")
                 if r.stderr:
@@ -175,7 +176,12 @@ class Filter:
             self._log("❌ PPTX->PDF produced no PDF file.")
             return None
         except subprocess.TimeoutExpired:
-            self._log("❌ LibreOffice conversion timed out.")
+            self._log(f"❌ LibreOffice conversion timed out after {self.valves.libreoffice_timeout_sec}s. Killing process...")
+            # Try to kill any lingering LibreOffice processes
+            try:
+                subprocess.run(["pkill", "-f", "soffice"], timeout=5, capture_output=True)
+            except:
+                pass
             return None
         except Exception as e:
             self._log(f"❌ PPTX->PDF error: {type(e).__name__}: {e}")
