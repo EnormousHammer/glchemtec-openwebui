@@ -41,10 +41,10 @@ class Filter:
         # Size & safety limits (prevents huge payloads) — bumped to avoid cutting pages at higher DPI
         max_total_image_mb: float = Field(default=64.0, description="Max total base64 image payload (MB)")
         # If you truly need unlimited, raise max_total_image_mb, but keep an eye on API payload limits.
-
+s
         # PPTX pipeline
         render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
-        libreoffice_timeout_sec: int = Field(default=15, description="LibreOffice timeout (sec) - fail fast, skip if hangs")
+        libreoffice_timeout_sec: int = Field(default=60, description="LibreOffice timeout (sec) - allow larger decks to finish")
 
         # Include PPTX extracted text/tables (helpful for copyable content)
         include_pptx_text: bool = Field(default=True, description="Extract slide text/tables via python-pptx (if available)")
