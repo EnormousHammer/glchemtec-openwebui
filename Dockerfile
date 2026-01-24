@@ -52,6 +52,20 @@ COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.p
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY start.sh /app/start.sh
 
+# Modify OpenWebUI's startup script to start proxy first
+RUN if [ -f /app/backend/start.sh ]; then \
+    cp /app/backend/start.sh /app/backend/start.sh.original && \
+    echo '#!/bin/bash' > /app/backend/start.sh && \
+    echo 'echo "=== Starting OpenAI Responses Proxy ==="' >> /app/backend/start.sh && \
+    echo 'python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 >&2 &' >> /app/backend/start.sh && \
+    echo 'PROXY_PID=$!' >> /app/backend/start.sh && \
+    echo 'echo "Proxy started with PID: $PROXY_PID"' >> /app/backend/start.sh && \
+    echo 'sleep 2' >> /app/backend/start.sh && \
+    echo 'echo "=== Starting OpenWebUI ==="' >> /app/backend/start.sh && \
+    echo 'exec bash /app/backend/start.sh.original "$@"' >> /app/backend/start.sh && \
+    chmod +x /app/backend/start.sh; \
+    fi
+
 # Create directories with proper permissions for NLTK and other data
 RUN mkdir -p /home/user/nltk_data && \
     mkdir -p /app/data && \
@@ -88,5 +102,4 @@ USER 1000
 # Expose ports (8080 for OpenWebUI, 8000 for proxy)
 EXPOSE 8080 8000
 
-# Override base image's entrypoint and use our startup script
-ENTRYPOINT ["/bin/bash", "/app/start.sh"]
+# Use base image's default entrypoint (it will call /app/backend/start.sh which we modified)
