@@ -1102,7 +1102,8 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
     for attempt in range(1, attempts + 1):
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
-                async with await _post_with_retry(client, url, headers, payload, attempts=1, stream=True) as resp:
+                resp_context = await _post_with_retry(client, url, headers, payload, attempts=1, stream=True)
+                async with resp_context as resp:
                     if resp.status_code >= 400:
                         if resp.status_code in (429, 500, 502, 503, 504) and attempt < attempts:
                             delay = base_delay * (2 ** (attempt - 1))
@@ -1226,7 +1227,7 @@ async def chat_completions(request: Request):
     messages = body.get("messages", [])
     stream = body.get("stream", False)
     
-    log(f"Received request for model: {model}, messages: {len(messages)}, stream: {stream}")
+    log(f"[PROXY] POST /v1/chat/completions - model: {model}, messages: {len(messages)}, stream: {stream}")
     
     # Collect all text and find PDF markers
     all_text = ""
@@ -1381,14 +1382,15 @@ async def _post_with_retry(client: httpx.AsyncClient, url: str, headers: dict, p
     for i in range(attempts):
         try:
             if stream:
-                resp = await client.stream("POST", url, headers=headers, json=payload)
+                # client.stream() returns an async context manager, don't await it
+                return client.stream("POST", url, headers=headers, json=payload)
             else:
                 resp = await client.post(url, headers=headers, json=payload)
-            if resp.status_code in (429, 500, 502, 503, 504) and i < attempts - 1:
-                await asyncio.sleep(base_delay * (2 ** i))
-                continue
-            resp.raise_for_status()
-            return resp
+                if resp.status_code in (429, 500, 502, 503, 504) and i < attempts - 1:
+                    await asyncio.sleep(base_delay * (2 ** i))
+                    continue
+                resp.raise_for_status()
+                return resp
         except Exception:
             if i == attempts - 1:
                 raise
@@ -2726,12 +2728,21 @@ async def sharepoint_browser_page():
 @app.get("/v1/models")
 async def list_models():
     """Forward models list request."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            f"{OPENAI_BASE_URL}/models",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"}
-        )
-        return JSONResponse(content=resp.json())
+    log("GET /v1/models - OpenWebUI is calling the proxy!")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                f"{OPENAI_BASE_URL}/models",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            model_count = len(data.get("data", []))
+            log(f"GET /v1/models - Success! Returning {model_count} models")
+            return JSONResponse(content=data)
+    except Exception as e:
+        log(f"GET /v1/models - ERROR: {e}")
+        raise
 
 
 @app.get("/metrics")
@@ -2742,9 +2753,17 @@ async def metrics():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    log("HEALTH CHECK: Proxy is alive and responding!")
+    return {"status": "ok", "service": "OpenAI Responses Proxy", "port": 8000}
 
 
 @app.get("/")
 async def root():
-    return {"service": "OpenAI Responses Proxy", "status": "running"}
+    log("ROOT ENDPOINT CALLED: Proxy is definitely running!")
+    return {"service": "OpenAI Responses Proxy", "status": "running", "port": 8000}
+
+@app.get("/test")
+async def test():
+    """Test endpoint to verify proxy is running - call this from OpenWebUI"""
+    log("TEST ENDPOINT CALLED: Proxy is alive!")
+    return {"status": "ok", "message": "Proxy is running on port 8000", "timestamp": time.time()}
