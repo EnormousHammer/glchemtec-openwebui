@@ -58,10 +58,16 @@ RUN if [ -f /app/backend/start.sh ]; then \
     echo '#!/bin/bash' > /app/backend/start.sh && \
     echo 'cd /app' >> /app/backend/start.sh && \
     echo 'echo "=== Starting OpenAI Responses Proxy ==="' >> /app/backend/start.sh && \
-    echo 'python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 >&2 &' >> /app/backend/start.sh && \
+    echo 'python3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &' >> /app/backend/start.sh && \
     echo 'PROXY_PID=$!' >> /app/backend/start.sh && \
     echo 'echo "Proxy started with PID: $PROXY_PID"' >> /app/backend/start.sh && \
-    echo 'sleep 2' >> /app/backend/start.sh && \
+    echo 'sleep 3' >> /app/backend/start.sh && \
+    echo 'if ! kill -0 $PROXY_PID 2>/dev/null; then' >> /app/backend/start.sh && \
+    echo '  echo "ERROR: Proxy process died immediately!"' >> /app/backend/start.sh && \
+    echo '  wait $PROXY_PID 2>/dev/null || true' >> /app/backend/start.sh && \
+    echo 'else' >> /app/backend/start.sh && \
+    echo '  echo "✓ Proxy is running (PID: $PROXY_PID)"' >> /app/backend/start.sh && \
+    echo 'fi' >> /app/backend/start.sh && \
     echo 'echo "=== Starting OpenWebUI ==="' >> /app/backend/start.sh && \
     echo 'exec bash /app/backend/start.sh.original "$@"' >> /app/backend/start.sh && \
     chmod +x /app/backend/start.sh; \
