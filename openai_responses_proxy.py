@@ -1123,12 +1123,14 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
                     else:
                         log(f"✅ Streaming started: waiting for response chunks...")
 
+                    chunk_count = 0
                     async for line in resp.aiter_lines():
                         if not line:
                             continue
                         if line.startswith("data:"):
                             data = line[len("data:"):].strip()
                             if data == "[DONE]":
+                                log(f"✅ Received [DONE] signal, stream complete ({chunk_count} chunks)")
                                 yield "data: [DONE]\n\n"
                                 return
                             try:
@@ -1148,9 +1150,12 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
                                     "finish_reason": None
                                 }]
                             }
+                            chunk_count += 1
+                            if chunk_count == 1:
+                                log(f"✅ First chunk received, streaming response...")
                             yield f"data: {json.dumps(chunk)}\n\n"
                     # If stream completed without [DONE], send a terminator
-                    log(f"✅ Stream completed successfully")
+                    log(f"✅ Stream completed ({chunk_count} chunks total)")
                     yield "data: [DONE]\n\n"
                     return
         except Exception as e:

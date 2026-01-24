@@ -30,7 +30,7 @@ class Filter:
 
         # ===== Rendering quality (CRITICAL) =====
         dpi: int = Field(default=300, description="DPI for PDF rendering (300 recommended for spectra)")
-        max_pages: int = Field(default=12, description="Max pages/slides to render as images")
+        max_pages: int = Field(default=6, description="Max pages/slides to render as images (reduced for faster processing)")
 
         # Output format: PNG is best for small text/spectra (lossless)
         output_format: str = Field(default="png", description="png (recommended) or jpeg")
