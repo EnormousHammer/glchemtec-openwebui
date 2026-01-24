@@ -13,49 +13,127 @@ from pathlib import Path
 PROXY_URL = os.environ.get("OPENAI_API_BASE_URLS", "http://localhost:8000/v1")
 API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
+def discover_schema(cursor):
+    """Discover actual database schema - no guessing."""
+    print("[CONFIG] Discovering database schema...")
+    
+    # Get all tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    all_tables = [row[0] for row in cursor.fetchall()]
+    print(f"[CONFIG] Found tables: {all_tables}")
+    
+    # Find connection-related tables
+    connection_tables = [t for t in all_tables if 'connection' in t.lower() or 'api' in t.lower()]
+    
+    for table_name in connection_tables:
+        print(f"[CONFIG] Examining table: {table_name}")
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = cursor.fetchall()
+        
+        # Log full schema
+        print(f"[CONFIG] Schema for {table_name}:")
+        for col in columns:
+            print(f"[CONFIG]   - {col[1]} ({col[2]})")
+        
+        # Check if this looks like a connection table
+        col_names = [col[1] for col in columns]
+        if 'type' in col_names or 'connection_type' in col_names:
+            return table_name, col_names
+    
+    return None, None
+
 def enforce_connection():
-    """Enforce OpenAI connection in database - production safe."""
+    """Enforce OpenAI connection - discovers actual schema first."""
     DATA_DIR = Path("/app/backend/data")
     DB_FILE = DATA_DIR / "webui.db"
     
     if not DB_FILE.exists():
+        print(f"[CONFIG] Database not found: {DB_FILE}")
         return False
     
     try:
         conn = sqlite3.connect(str(DB_FILE))
         cursor = conn.cursor()
         
-        # Check if connection table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='connection'")
-        if not cursor.fetchone():
+        # Discover actual schema
+        table_name, columns = discover_schema(cursor)
+        
+        if not table_name:
+            print("[CONFIG] No connection table found. Cannot set connection.")
             conn.close()
             return False
         
+        # Build query based on actual columns
         connection_data = json.dumps({
             "base_url": PROXY_URL,
             "api_key": API_KEY,
             "models": []
         })
         
-        # Delete ALL OpenAI connections first (prevents duplicates/resets)
-        cursor.execute("DELETE FROM connection WHERE type = 'openai'")
+        # Find type column
+        type_col = "type" if "type" in columns else ("connection_type" if "connection_type" in columns else None)
+        if not type_col:
+            print(f"[CONFIG] No type column found in {table_name}. Columns: {columns}")
+            conn.close()
+            return False
+        
+        # Delete existing OpenAI connections
+        cursor.execute(f"DELETE FROM {table_name} WHERE {type_col} = 'openai'")
         deleted = cursor.rowcount
         if deleted > 0:
-            print(f"[CONFIG] Removed {deleted} existing OpenAI connection(s) to prevent conflicts")
+            print(f"[CONFIG] Removed {deleted} existing OpenAI connection(s)")
         
-        # Create the correct connection
+        # Build INSERT based on actual columns
         import uuid
-        cursor.execute(
-            "INSERT INTO connection (id, name, type, data, base_url) VALUES (?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), "OpenAI (Proxy)", "openai", connection_data, PROXY_URL)
-        )
+        conn_id = str(uuid.uuid4())
+        
+        # Determine which columns to use
+        insert_cols = []
+        insert_vals = []
+        
+        if "id" in columns:
+            insert_cols.append("id")
+            insert_vals.append(conn_id)
+        
+        if "name" in columns:
+            insert_cols.append("name")
+            insert_vals.append("OpenAI (Proxy)")
+        
+        insert_cols.append(type_col)
+        insert_vals.append("openai")
+        
+        if "data" in columns:
+            insert_cols.append("data")
+            insert_vals.append(connection_data)
+        
+        if "base_url" in columns:
+            insert_cols.append("base_url")
+            insert_vals.append(PROXY_URL)
+        elif "baseUrl" in columns:
+            insert_cols.append("baseUrl")
+            insert_vals.append(PROXY_URL)
+        elif "url" in columns:
+            insert_cols.append("url")
+            insert_vals.append(PROXY_URL)
+        
+        # Execute INSERT
+        placeholders = ", ".join(["?"] * len(insert_vals))
+        col_names = ", ".join(insert_cols)
+        query = f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders})"
+        
+        print(f"[CONFIG] Executing: {query}")
+        print(f"[CONFIG] Values: {insert_vals}")
+        
+        cursor.execute(query, insert_vals)
         conn.commit()
         print(f"[CONFIG] ✅ Connection enforced: {PROXY_URL}")
         conn.close()
         return True
         
     except Exception as e:
-        print(f"[CONFIG] Error: {e}", file=sys.stderr)
+        print(f"[CONFIG] Error: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return False
 
 def main():
