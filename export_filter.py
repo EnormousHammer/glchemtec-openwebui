@@ -453,6 +453,14 @@ class Filter:
             if file_path and os.path.exists(file_path):
                 mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 file_size_kb = file_size // 1024 if file_size else 0
+                # Build a data URL download link (best-effort, suitable for small files)
+                download_link = None
+                try:
+                    with open(file_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    download_link = f"[Download {filename} ({file_size_kb} KB)](data:{mime_type};base64,{b64})"
+                except Exception as e:
+                    self._log(f"Failed to build data URL download link: {e}")
                 
                 # Create file attachment object that OpenWebUI recognizes
                 file_attachment = {
@@ -527,7 +535,7 @@ class Filter:
                         export_note += f"\n\n☁️ **SharePoint**: Upload to SharePoint available (configure credentials to enable)"
                     
                     if isinstance(last_msg.get("content"), str):
-                        last_msg["content"] = content + export_note
+                        last_msg["content"] = content + export_note + (f"\n\n{download_link}" if download_link else "")
                     elif isinstance(last_msg.get("content"), list):
                         # Clean any text blocks that contain long base64
                         cleaned_content = []
@@ -542,7 +550,7 @@ class Filter:
                         last_msg["content"] = cleaned_content
                         last_msg["content"].append({
                             "type": "text",
-                            "text": export_note
+                            "text": export_note + (f"\n\n{download_link}" if download_link else "")
                         })
                     
                     self._log(f"Enhanced assistant message with file attachment: {filename}")
