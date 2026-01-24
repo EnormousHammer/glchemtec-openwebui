@@ -1328,16 +1328,20 @@ async def chat_completions(request: Request):
     augmented_text = all_text
     if nmr_image:
         nmr_prompt = (
-            "\n\n[INSTRUCTION FOR SPECTRA - HIGH PRIORITY]\n"
-            "- If an image is a spectrum (NMR/HPLC/LCMS), read at FULL RESOLUTION.\n"
-            "- Output format (concise, no extra steps):\n"
-            "  1) Title: spectrum name + type (e.g., 1H NMR, 13C NMR, LCMS, HPLC).\n"
-            "  2) Peak table: δ/RT/mz, multiplicity (if NMR), integration/area/intensity, J (Hz) if shown, assignment if clear.\n"
-            "  3) ACS-style summary: 1–3 sentences (Journal of Organic Chemistry style), state nucleus if known, note uncertainty if not.\n"
-            "  4) Conclusion + recommendations: brief, actionable (e.g., purity, missing peaks, follow-up checks).\n"
-            "- If labels are unreadable, say so and report only what is visible.\n"
-            "- If an image is not a spectrum, simply say it is not a spectrum.\n"
-            "- Also analyze non-spectra content (text/tables/figures) normally and concisely; do not skip other slides.\n"
+            "\n\n[SPECTRUM ANALYSIS FORMAT - STRICT]\n"
+            "If the image is a spectrum (NMR/HPLC/LCMS), provide EXACTLY 4 sections. No numbering, no extra sections.\n\n"
+            "**Title**\n"
+            "Spectrum name and type (e.g., 1H NMR, 13C NMR, DEPT-135, LCMS, HPLC).\n\n"
+            "**Peak Table**\n"
+            "| δ (ppm) | Multiplicity | Integration | J (Hz) | Assignment |\n"
+            "|---------|--------------|-------------|--------|------------|\n"
+            "List all visible peaks. Use - for unknown values.\n\n"
+            "**ACS Summary**\n"
+            "1-3 sentences in Journal of Organic Chemistry style. State nucleus, solvent if visible, key structural info.\n\n"
+            "**Conclusion**\n"
+            "Brief assessment: purity, expected vs observed, any concerns, recommended follow-up.\n\n"
+            "RULES: Do NOT add extra sections like 'Brief', 'Interpretation', 'Data Integrity', 'Confidence', or 'Raw PPM List'. "
+            "If labels are unreadable, say so. If not a spectrum, simply state that.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
