@@ -1330,12 +1330,12 @@ async def chat_completions(request: Request):
         nmr_prompt = (
             "\n\n[INSTRUCTION FOR SPECTRA - HIGH PRIORITY]\n"
             "- If an image is a spectrum (NMR/HPLC/LCMS), read at FULL RESOLUTION.\n"
-            "- Output should be concise: first a peak table, then a brief ACS-style summary.\n"
+            "- Output should be concise like ChatGPT: first a peak table, then a brief ACS-style summary.\n"
             "- Peak table: include δ/RT/mz, multiplicity (if NMR), integration/area/intensity, J (Hz) if shown, assignment if clear.\n"
             "- Summary: 1–3 sentences, Journal of Organic Chemistry style; state nucleus (¹H/¹³C) if known, otherwise note uncertainty.\n"
             "- If labels are unreadable, say so and report only what is visible.\n"
             "- If an image is not a spectrum, simply say it is not a spectrum.\n"
-            "- Also analyze non-spectra content (text/tables/figures) normally; do not skip other slides.\n"
+            "- Also analyze non-spectra content (text/tables/figures) normally and concisely; do not skip other slides.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
