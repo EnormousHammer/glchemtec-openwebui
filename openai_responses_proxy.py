@@ -1328,20 +1328,17 @@ async def chat_completions(request: Request):
     augmented_text = all_text
     if nmr_image:
         nmr_prompt = (
-            "\n\n[SPECTRUM ANALYSIS FORMAT - STRICT]\n"
-            "If the image is a spectrum (NMR/HPLC/LCMS), provide EXACTLY 4 sections. No numbering, no extra sections.\n\n"
+            "\n\n[SPECTRUM ANALYSIS FORMAT]\n"
+            "If the image is a spectrum (NMR/HPLC/LCMS), provide these 4 sections only:\n\n"
             "**Title**\n"
-            "Spectrum name and type (e.g., 1H NMR, 13C NMR, DEPT-135, LCMS, HPLC).\n\n"
+            "Name and type of spectrum.\n\n"
             "**Peak Table**\n"
-            "| δ (ppm) | Multiplicity | Integration | J (Hz) | Assignment |\n"
-            "|---------|--------------|-------------|--------|------------|\n"
-            "List all visible peaks. Use - for unknown values.\n\n"
+            "All peaks with their data.\n\n"
             "**ACS Summary**\n"
-            "1-3 sentences in Journal of Organic Chemistry style. State nucleus, solvent if visible, key structural info.\n\n"
+            "ACS-style summary.\n\n"
             "**Conclusion**\n"
-            "Brief assessment: purity, expected vs observed, any concerns, recommended follow-up.\n\n"
-            "RULES: Do NOT add extra sections like 'Brief', 'Interpretation', 'Data Integrity', 'Confidence', or 'Raw PPM List'. "
-            "If labels are unreadable, say so. If not a spectrum, simply state that.\n"
+            "Assessment and recommendations.\n\n"
+            "Do not add other sections. If not a spectrum, say so.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
