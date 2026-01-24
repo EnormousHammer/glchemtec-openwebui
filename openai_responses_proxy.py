@@ -1335,6 +1335,7 @@ async def chat_completions(request: Request):
             "- Summary: 1–3 sentences, Journal of Organic Chemistry style; state nucleus (¹H/¹³C) if known, otherwise note uncertainty.\n"
             "- If labels are unreadable, say so and report only what is visible.\n"
             "- If an image is not a spectrum, simply say it is not a spectrum.\n"
+            "- Also analyze non-spectra content (text/tables/figures) normally; do not skip other slides.\n"
         )
         augmented_text = (all_text + nmr_prompt).strip()
         log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
