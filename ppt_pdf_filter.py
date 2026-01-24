@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 10.0
-description: PPT/PPTX -> PDF (LibreOffice) -> high-DPI PNG pages for vision + PDF vision. Optimized for spectra (NMR/HPLC) clarity.
+version: 10.1
+description: PPT/PPTX -> PDF (LibreOffice) -> high-DPI PNG pages for vision + PDF vision. Extracts EMF/WMF images. Optimized for spectra (NMR/HPLC) clarity.
 """
 
 import os
@@ -10,6 +10,7 @@ import base64
 import tempfile
 import shutil
 import subprocess
+import zipfile
 from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field
@@ -41,7 +42,7 @@ class Filter:
         # Size & safety limits (prevents huge payloads) — bumped to avoid cutting pages at higher DPI
         max_total_image_mb: float = Field(default=64.0, description="Max total base64 image payload (MB)")
         # If you truly need unlimited, raise max_total_image_mb, but keep an eye on API payload limits.
-s
+        
         # PPTX pipeline
         render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
         libreoffice_timeout_sec: int = Field(default=60, description="LibreOffice timeout (sec) - allow larger decks to finish")
@@ -270,6 +271,118 @@ s
             return None
 
     # -------------------------
+    # EMF/WMF extraction from PPTX
+    # -------------------------
+    def extract_emf_wmf_images(self, ppt_path: str, output_dir: str) -> List[str]:
+        """
+        Extract EMF/WMF images from PPTX and convert to PNG.
+        EMF/WMF are vector formats commonly used for chemical structures in PowerPoint.
+        """
+        extracted_paths: List[str] = []
+        
+        try:
+            with zipfile.ZipFile(ppt_path, 'r') as pptx_zip:
+                # Find all EMF/WMF files in the media folder
+                media_files = [f for f in pptx_zip.namelist() 
+                              if f.startswith('ppt/media/') and 
+                              f.lower().endswith(('.emf', '.wmf'))]
+                
+                if not media_files:
+                    self._log("No EMF/WMF images found in PPTX")
+                    return extracted_paths
+                
+                self._log(f"Found {len(media_files)} EMF/WMF images in PPTX")
+                
+                for i, media_file in enumerate(media_files):
+                    try:
+                        # Extract the EMF/WMF file
+                        ext = os.path.splitext(media_file)[1].lower()
+                        temp_emf = os.path.join(output_dir, f"emf_{i}{ext}")
+                        
+                        with pptx_zip.open(media_file) as src:
+                            with open(temp_emf, 'wb') as dst:
+                                dst.write(src.read())
+                        
+                        # Convert EMF/WMF to PNG using ImageMagick or LibreOffice
+                        output_png = os.path.join(output_dir, f"emf_{i}.png")
+                        
+                        # Try ImageMagick first (faster)
+                        convert_cmd = shutil.which("convert") or shutil.which("magick")
+                        if convert_cmd:
+                            result = subprocess.run(
+                                [convert_cmd, "-density", str(self.valves.dpi), 
+                                 temp_emf, "-background", "white", "-flatten", output_png],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            if result.returncode == 0 and os.path.exists(output_png):
+                                extracted_paths.append(output_png)
+                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via ImageMagick")
+                                continue
+                        
+                        # Fallback: try LibreOffice
+                        lo = self._find_libreoffice()
+                        if lo:
+                            # LibreOffice can convert EMF to PDF, then we convert PDF to PNG
+                            result = subprocess.run(
+                                [lo, "--headless", "--convert-to", "png", 
+                                 "--outdir", output_dir, temp_emf],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            expected_png = os.path.join(output_dir, f"emf_{i}.png")
+                            if os.path.exists(expected_png):
+                                extracted_paths.append(expected_png)
+                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via LibreOffice")
+                                continue
+                        
+                        # Fallback: try inkscape for WMF
+                        inkscape = shutil.which("inkscape")
+                        if inkscape and ext == '.wmf':
+                            result = subprocess.run(
+                                [inkscape, temp_emf, "--export-type=png", 
+                                 f"--export-filename={output_png}",
+                                 f"--export-dpi={self.valves.dpi}"],
+                                capture_output=True,
+                                timeout=30
+                            )
+                            if os.path.exists(output_png):
+                                extracted_paths.append(output_png)
+                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via Inkscape")
+                                continue
+                        
+                        self._log(f"⚠️ Could not convert {os.path.basename(media_file)} - no converter available")
+                        
+                    except Exception as e:
+                        self._log(f"⚠️ Error extracting {media_file}: {e}")
+                
+                # Also extract regular images (PNG, JPG) that might be structures
+                regular_images = [f for f in pptx_zip.namelist() 
+                                 if f.startswith('ppt/media/') and 
+                                 f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                
+                for i, img_file in enumerate(regular_images):
+                    try:
+                        ext = os.path.splitext(img_file)[1].lower()
+                        output_path = os.path.join(output_dir, f"img_{i}{ext}")
+                        
+                        with pptx_zip.open(img_file) as src:
+                            with open(output_path, 'wb') as dst:
+                                dst.write(src.read())
+                        
+                        # Only include if it's a reasonable size (likely a structure, not a tiny icon)
+                        if os.path.getsize(output_path) > 5000:  # > 5KB
+                            extracted_paths.append(output_path)
+                            self._log(f"✅ Extracted {os.path.basename(img_file)}")
+                    except Exception as e:
+                        self._log(f"⚠️ Error extracting {img_file}: {e}")
+                        
+        except Exception as e:
+            self._log(f"❌ EMF/WMF extraction error: {e}")
+        
+        return extracted_paths
+
+    # -------------------------
     # PPTX text/table extraction
     # -------------------------
     def extract_pptx_text_tables(self, ppt_path: str) -> Dict[str, Any]:
@@ -362,7 +475,7 @@ s
     # -------------------------
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         self._log("=" * 60)
-        self._log("INLET - PPT/PDF Vision Filter v10.0 (PPT->PDF->PNG)")
+        self._log("INLET - PPT/PDF Vision Filter v10.1 (PPT->PDF->PNG + EMF/WMF)")
         if not self.valves.enabled:
             return body
 
@@ -411,6 +524,18 @@ s
                     if extracted.get("slides"):
                         all_text_sections.append(self.format_pptx_text_tables(extracted, file_name))
                         self._log(f"✅ Extracted text from {len(extracted.get('slides', []))} slides")
+                    
+                    # Extract EMF/WMF images (chemical structures) from PPTX
+                    emf_paths = self.extract_emf_wmf_images(file_path, tmp)
+                    for p in emf_paths:
+                        url = self.image_file_to_data_url(p)
+                        if url:
+                            all_images.append({
+                                "type": "image_url",
+                                "image_url": {"url": url}
+                            })
+                    if emf_paths:
+                        self._log(f"✅ Added {len(emf_paths)} EMF/WMF/embedded images from {file_name}")
 
                 # PDF direct
                 if is_pdf:

@@ -1,8 +1,8 @@
 """
 title: Document Filter
 author: GLChemTec
-version: 1.0
-description: Extracts text and images from DOCX, XLSX, CSV, and other document formats for OpenAI Vision analysis.
+version: 1.1
+description: Extracts text and images from DOCX, XLSX, CSV, ChemDraw, and other document formats for OpenAI Vision analysis.
 """
 
 import os
@@ -353,11 +353,226 @@ class Filter:
         return result
 
     # -------------------------
+    # ChemDraw CDX/CDXML extraction
+    # -------------------------
+    def _extract_chemdraw(self, file_path: str, file_name: str) -> Dict[str, Any]:
+        """Extract structure data and embedded images from ChemDraw files."""
+        result = {"text": "", "images": []}
+        
+        try:
+            is_cdxml = file_name.endswith('.cdxml')
+            
+            if is_cdxml:
+                # CDXML is XML-based, can extract text directly
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                
+                import re
+                
+                # Extract molecule names
+                names = re.findall(r'<s[^>]*>([^<]+)</s>', content)
+                
+                # Extract text annotations
+                texts = re.findall(r'<t[^>]*>([^<]*(?:<s[^>]*>[^<]*</s>[^<]*)*)</t>', content)
+                
+                # Extract chemical formulas if present
+                formulas = re.findall(r'Formula="([^"]+)"', content)
+                
+                # Extract molecular weights
+                mol_weights = re.findall(r'MolecularWeight="([^"]+)"', content)
+                
+                # Build structured output
+                parts = ["=== ChemDraw Structure Data ===\n"]
+                
+                if formulas:
+                    parts.append("**Molecular Formulas:**")
+                    for f in set(formulas):
+                        parts.append(f"  - {f}")
+                    parts.append("")
+                
+                if mol_weights:
+                    parts.append("**Molecular Weights:**")
+                    for mw in set(mol_weights):
+                        parts.append(f"  - {mw}")
+                    parts.append("")
+                
+                # Clean and add text content
+                all_text = []
+                for t in texts:
+                    # Remove XML tags from text
+                    clean = re.sub(r'<[^>]+>', '', t).strip()
+                    if clean and len(clean) > 1:
+                        all_text.append(clean)
+                
+                if all_text:
+                    parts.append("**Text/Labels:**")
+                    for t in set(all_text):
+                        parts.append(f"  - {t}")
+                    parts.append("")
+                
+                # Extract embedded PNG images from CDXML
+                png_matches = re.findall(r'<embedded[^>]*type="image/png"[^>]*>([^<]+)</embedded>', content)
+                for i, png_b64 in enumerate(png_matches[:self.valves.max_images]):
+                    try:
+                        # Clean base64 string
+                        clean_b64 = png_b64.strip().replace('\n', '').replace('\r', '').replace(' ', '')
+                        data_url = f"data:image/png;base64,{clean_b64}"
+                        result["images"].append({
+                            "type": "image_url",
+                            "image_url": {"url": data_url}
+                        })
+                    except Exception as e:
+                        self._log(f"Error extracting embedded image {i}: {e}")
+                
+                result["text"] = "\n".join(parts)[:self.valves.max_text_chars]
+                self._log(f"Extracted {len(result['text'])} chars and {len(result['images'])} images from CDXML")
+                
+            else:
+                # CDX is binary format - extract what we can
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                
+                # Try to find text strings in binary
+                import re
+                # Look for ASCII text sequences (chemical names, labels)
+                text_matches = re.findall(rb'[\x20-\x7E]{4,100}', content)
+                
+                # Filter for chemistry-relevant strings
+                chem_keywords = ['mol', 'atom', 'bond', 'ring', 'chain', 'formula', 'weight', 
+                                'reagent', 'product', 'yield', 'temp', 'time', 'equiv',
+                                'mmol', 'mg', 'ml', 'hr', 'min', 'rt', 'reflux']
+                
+                relevant_texts = []
+                for t in text_matches:
+                    try:
+                        decoded = t.decode('ascii', errors='ignore').strip()
+                        # Keep if it looks like chemistry content
+                        if any(kw in decoded.lower() for kw in chem_keywords) or \
+                           re.match(r'^[A-Z][a-z]?\d*', decoded) or \
+                           len(decoded) > 10:
+                            relevant_texts.append(decoded)
+                    except:
+                        pass
+                
+                # Look for embedded PNG in binary CDX
+                png_header = b'\x89PNG\r\n\x1a\n'
+                png_end = b'IEND\xaeB`\x82'
+                
+                pos = 0
+                while pos < len(content) and len(result["images"]) < self.valves.max_images:
+                    start = content.find(png_header, pos)
+                    if start == -1:
+                        break
+                    end = content.find(png_end, start)
+                    if end == -1:
+                        break
+                    end += len(png_end)
+                    
+                    png_data = content[start:end]
+                    if len(png_data) < self.valves.max_image_size_mb * 1024 * 1024:
+                        b64 = base64.b64encode(png_data).decode('utf-8')
+                        result["images"].append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"}
+                        })
+                    pos = end
+                
+                parts = ["=== ChemDraw Binary File ===\n"]
+                parts.append("(Binary CDX format - limited text extraction)\n")
+                
+                if relevant_texts:
+                    parts.append("**Extracted Text/Labels:**")
+                    for t in list(set(relevant_texts))[:50]:  # Limit to 50 unique strings
+                        parts.append(f"  - {t}")
+                
+                result["text"] = "\n".join(parts)[:self.valves.max_text_chars]
+                self._log(f"Extracted {len(result['text'])} chars and {len(result['images'])} images from CDX")
+        
+        except Exception as e:
+            self._log(f"Error extracting ChemDraw file: {e}")
+            import traceback
+            self._log(traceback.format_exc())
+        
+        return result
+
+    # -------------------------
+    # MOL/SDF structure file extraction
+    # -------------------------
+    def _extract_mol_sdf(self, file_path: str, file_name: str) -> Dict[str, Any]:
+        """Extract structure data from MOL/SDF files."""
+        result = {"text": "", "images": []}
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            parts = [f"=== Chemical Structure File: {file_name} ===\n"]
+            
+            if file_name.endswith('.sdf'):
+                # SDF can contain multiple molecules separated by $$$$
+                molecules = content.split('$$$$')
+                parts.append(f"**Contains {len([m for m in molecules if m.strip()])} molecule(s)**\n")
+                
+                for i, mol in enumerate(molecules[:10], 1):  # Limit to first 10
+                    if not mol.strip():
+                        continue
+                    
+                    lines = mol.strip().split('\n')
+                    if lines:
+                        # First line is usually molecule name
+                        mol_name = lines[0].strip()
+                        if mol_name:
+                            parts.append(f"**Molecule {i}:** {mol_name}")
+                        
+                        # Look for data fields (lines starting with > <FIELD_NAME>)
+                        import re
+                        fields = re.findall(r'>\s*<([^>]+)>\s*\n([^\n>]+)', mol)
+                        for field_name, field_value in fields:
+                            parts.append(f"  {field_name}: {field_value.strip()}")
+                        parts.append("")
+            else:
+                # Single MOL file
+                lines = content.split('\n')
+                if lines:
+                    mol_name = lines[0].strip()
+                    if mol_name:
+                        parts.append(f"**Molecule Name:** {mol_name}")
+                    
+                    # Parse counts line (line 4 in V2000 format)
+                    if len(lines) > 3:
+                        counts_line = lines[3].strip()
+                        # Format: aaabbblllfffcccsssxxxrrrpppiiimmmvvvvvv
+                        # aaa = number of atoms, bbb = number of bonds
+                        try:
+                            num_atoms = int(counts_line[0:3].strip())
+                            num_bonds = int(counts_line[3:6].strip())
+                            parts.append(f"**Atoms:** {num_atoms}")
+                            parts.append(f"**Bonds:** {num_bonds}")
+                        except:
+                            pass
+            
+            # Include raw content for AI analysis
+            parts.append("\n**Raw Structure Data:**")
+            parts.append("```")
+            parts.append(content[:5000])  # Limit raw content
+            if len(content) > 5000:
+                parts.append("... (truncated)")
+            parts.append("```")
+            
+            result["text"] = "\n".join(parts)[:self.valves.max_text_chars]
+            self._log(f"Extracted {len(result['text'])} chars from MOL/SDF")
+            
+        except Exception as e:
+            self._log(f"Error extracting MOL/SDF: {e}")
+        
+        return result
+
+    # -------------------------
     # Main filter
     # -------------------------
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         self._log("=" * 60)
-        self._log("INLET - Document Filter v1.0")
+        self._log("INLET - Document Filter v1.1 (with ChemDraw/MOL/SDF)")
         
         if not self.valves.enabled:
             return body
@@ -424,6 +639,16 @@ class Filter:
             elif file_name.endswith((".txt", ".md", ".json")):
                 self._log(f"Processing text file: {file_name}")
                 extracted = self._extract_text_file(file_path)
+            
+            # ChemDraw files
+            elif file_name.endswith((".cdx", ".cdxml")):
+                self._log(f"Processing ChemDraw: {file_name}")
+                extracted = self._extract_chemdraw(file_path, file_name)
+            
+            # MOL/SDF structure files
+            elif file_name.endswith((".mol", ".mol2", ".sdf")):
+                self._log(f"Processing structure file: {file_name}")
+                extracted = self._extract_mol_sdf(file_path, file_name)
             
             else:
                 self._log(f"Unsupported file type: {file_name}")
