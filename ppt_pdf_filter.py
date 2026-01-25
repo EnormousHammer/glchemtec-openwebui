@@ -571,8 +571,7 @@ class Filter:
         if all_images:
             combined_text += (
                 f"Attached are {len(all_images)} high-resolution page images for visual analysis "
-                f"(rendered at {self.valves.dpi} DPI, format={self.valves.output_format}).\n"
-                "If you see spectra (NMR/HPLC/LCMS), read axes/labels carefully and extract peak tables if legible.\n\n"
+                f"(rendered at {self.valves.dpi} DPI, format={self.valves.output_format}).\n\n"
             )
 
         # Replace last message content with a text block + image blocks

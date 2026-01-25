@@ -995,7 +995,7 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
     else:
         content_items.append({
             "type": "input_text",
-            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, chemical structures, and spectra. For any spectra (NMR, HPLC, MS), read peak values if legible."
+            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, and chemical structures."
         })
     
     payload = {
@@ -1118,7 +1118,7 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
     else:
         content_items.append({
             "type": "input_text",
-            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, chemical structures, and spectra. For any spectra (NMR, HPLC, MS), read peak values if legible."
+            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, and chemical structures."
         })
     
     payload = {
@@ -1323,25 +1323,8 @@ async def chat_completions(request: Request):
     
     log(f"Found {len(all_pdfs)} PDF(s), {len(all_images)} image(s), {len(all_text_blocks)} text block(s) (markers+uploads)")
 
-    # If any images are present, add conditional NMR instructions for the model
-    nmr_image = bool(upload_images or marker_images)
+    # Use the user's text as-is - system prompt in OpenWebUI handles all instructions
     augmented_text = all_text
-    if nmr_image:
-        nmr_prompt = (
-            "\n\n[SPECTRUM ANALYSIS FORMAT]\n"
-            "If the image is a spectrum (NMR/HPLC/LCMS), provide these 4 sections only:\n\n"
-            "**Title**\n"
-            "Name and type of spectrum.\n\n"
-            "**Peak Table**\n"
-            "All peaks with their data.\n\n"
-            "**ACS Summary**\n"
-            "ACS-style summary.\n\n"
-            "**Conclusion**\n"
-            "Assessment and recommendations.\n\n"
-            "Do not add other sections. If not a spectrum, say so.\n"
-        )
-        augmented_text = (all_text + nmr_prompt).strip()
-        log(f"📊 Added NMR analysis instructions - {len(upload_images) + len(marker_images)} images will be analyzed")
     
     # Only use Responses API for PDFs - use faster Chat Completions for images
     if all_pdfs:
