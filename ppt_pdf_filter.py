@@ -616,6 +616,32 @@ class Filter:
                     slide_count = self._count_slides(file_path)
                     self._log(f"Processing PPTX: {slide_count} slides")
                     
+                    # Calculate estimated processing time and notify user
+                    # Estimate: ~30s base + 3s per slide for conversion + 2s per slide for rendering
+                    estimated_seconds = 30 + (slide_count * 3) + (slide_count * 2)
+                    estimated_minutes = max(1, round(estimated_seconds / 60))
+                    estimated_max_minutes = max(1, round((estimated_seconds + 30) / 60))  # Add buffer
+                    
+                    # Add user notification to the message
+                    last_user_msg = None
+                    for msg in reversed(messages):
+                        if msg.get("role") == "user":
+                            last_user_msg = msg
+                            break
+                    
+                    if last_user_msg:
+                        time_message = f"\n\n[⏱️ Processing {slide_count} slides - this will take approximately {estimated_minutes}-{estimated_max_minutes} minute{'s' if estimated_max_minutes > 1 else ''} to complete. Please wait...]"
+                        
+                        if isinstance(last_user_msg.get("content"), str):
+                            last_user_msg["content"] = last_user_msg["content"] + time_message
+                        elif isinstance(last_user_msg.get("content"), list):
+                            if not last_user_msg.get("content"):
+                                last_user_msg["content"] = []
+                            last_user_msg["content"].append({
+                                "type": "text",
+                                "text": time_message
+                            })
+                    
                     # Extract text (FAST - always do this first)
                     text = self._extract_pptx_text(file_path)
                     if text:
