@@ -43,22 +43,22 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # Copy proxy script, filters, and startup script
 COPY openai_responses_proxy.py /app/openai_responses_proxy.py
-# TEMPORARILY DISABLED ALL FILTERS TO FIX BROKEN OPENWEBUI
 # Place filters in both default locations to ensure auto-load
-# COPY export_filter.py /app/backend/filters/export_filter.py
-# COPY export_filter.py /app/backend/custom/filters/export_filter.py
-# COPY ppt_pdf_filter.py /app/backend/filters/ppt_pdf_filter.py
-# COPY ppt_pdf_filter.py /app/backend/custom/filters/ppt_pdf_filter.py
-# COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
-# COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
-# COPY document_filter.py /app/backend/filters/document_filter.py
-# COPY document_filter.py /app/backend/custom/filters/document_filter.py
+COPY export_filter.py /app/backend/filters/export_filter.py
+COPY export_filter.py /app/backend/custom/filters/export_filter.py
+COPY ppt_pdf_filter.py /app/backend/filters/ppt_pdf_filter.py
+COPY ppt_pdf_filter.py /app/backend/custom/filters/ppt_pdf_filter.py
+COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.py
+COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
+COPY document_filter.py /app/backend/filters/document_filter.py
+COPY document_filter.py /app/backend/custom/filters/document_filter.py
 COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
 COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
+COPY fix_database_wal.py /app/fix_database_wal.py
 COPY backend_startup_hook.py /app/backend/backend_startup_hook.py
 
 # Modify OpenWebUI's startup script to start proxy first
@@ -91,7 +91,8 @@ RUN mkdir -p /home/user/nltk_data && \
     chmod +x /app/openai_responses_proxy.py && \
     chmod +x /app/start.sh && \
     chmod +x /app/set_default_connection.py && \
-    chmod +x /app/set_connection_on_startup.py
+    chmod +x /app/set_connection_on_startup.py && \
+    chmod +x /app/fix_database_wal.py
 
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt', download_dir='/home/user/nltk_data'); nltk.download('averaged_perceptron_tagger', download_dir='/home/user/nltk_data'); nltk.download('stopwords', download_dir='/home/user/nltk_data')" || true

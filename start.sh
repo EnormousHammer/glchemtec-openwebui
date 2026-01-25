@@ -56,6 +56,9 @@ fi
 # Ensure PORT is available to OpenWebUI
 export PORT=${PORT:-8080}
 
+# Fix database to use WAL mode (prevents locking issues)
+python3 /app/fix_database_wal.py >/tmp/db_wal_fix.log 2>&1 || true
+
 # Force OpenAI connection to localhost:8000/v1 before launching OpenWebUI
 python3 /app/set_default_connection.py >/tmp/connection_default.log 2>&1 || true
 python3 /app/set_connection_on_startup.py >/tmp/connection_enforce.log 2>&1 &
