@@ -52,6 +52,14 @@ class Filter:
             self.valves = self.Valves(export_service_url=export_url, public_base_url=public_url)
             # Force SharePoint export off regardless of env
             self.valves.enable_sharepoint = False
+            
+            # Test proxy connectivity on init
+            try:
+                test_response = requests.get(f"{export_url}/health", timeout=2)
+                self._log(f"Export filter initialized - proxy reachable at {export_url}")
+            except:
+                self._log(f"WARNING: Export proxy may not be running at {export_url} - exports may fail")
+            
             self._log(f"Export filter initialized (public_url: {public_url})")
         except Exception as e:
             # If initialization fails, disable the filter to prevent crashes
@@ -211,16 +219,37 @@ class Filter:
         try:
             url = f"{self.valves.export_service_url}/v1/report/{format_type}"
             self._log(f"Requesting export from: {url}")
+            self._log(f"Report keys: {list(report.keys())}")
             
-            response = requests.post(url, json=report, timeout=60)
+            # Make request with proper headers
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(url, json=report, headers=headers, timeout=60, stream=True)
+            
+            self._log(f"Response status: {response.status_code}")
             
             if response.status_code == 200:
-                return response.content
+                # Read all content from streaming response
+                file_bytes = response.content
+                self._log(f"Successfully received {len(file_bytes)} bytes")
+                if len(file_bytes) == 0:
+                    self._log("ERROR: Received empty file!")
+                    return None
+                return file_bytes
             else:
-                self._log(f"Export failed: {response.status_code} - {response.text[:200]}")
+                error_text = response.text[:500] if hasattr(response, 'text') else "No error details"
+                self._log(f"Export failed: HTTP {response.status_code}")
+                self._log(f"Error response: {error_text}")
                 return None
+        except requests.exceptions.ConnectionError as e:
+            self._log(f"Connection error - proxy not reachable at {self.valves.export_service_url}: {e}")
+            return None
+        except requests.exceptions.Timeout as e:
+            self._log(f"Request timeout after 60s: {e}")
+            return None
         except Exception as e:
-            self._log(f"Export error: {e}")
+            self._log(f"Export error: {type(e).__name__}: {e}")
+            import traceback
+            self._log(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _create_export_with_link(self, report: Dict[str, Any], format_type: str) -> Optional[Dict[str, Any]]:
