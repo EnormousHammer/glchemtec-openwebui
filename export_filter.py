@@ -223,13 +223,22 @@ class Filter:
             "sections": []
         }
 
+        self._log(f"Building report from {len(messages)} messages")
         current_section = None
+        sections_added = 0
+        total_content_chars = 0
+        
         for msg in messages:
             role = msg.get("role", "")
             content = self._extract_text_content(msg.get("content", ""))
             
             if not content.strip():
+                self._log(f"Skipping empty {role} message")
                 continue
+
+            content_len = len(content)
+            total_content_chars += content_len
+            self._log(f"Processing {role} message: {content_len} chars")
 
             if role == "user":
                 # User message becomes a section heading
@@ -243,12 +252,25 @@ class Filter:
                 # Assistant response becomes the body
                 current_section["body"] = content
                 report["sections"].append(current_section)
+                sections_added += 1
                 current_section = None
             elif role == "assistant" and not current_section:
                 # Standalone assistant message
                 report["sections"].append({
                     "heading": "Response",
                     "body": content,
+                    "bullets": []
+                })
+                sections_added += 1
+
+        self._log(f"Report built: {sections_added} sections, {total_content_chars} total characters")
+        if sections_added == 0:
+            self._log(f"WARNING: No sections added to report! Messages: {len(messages)}")
+            # Add at least something so PDF isn't empty
+            if messages:
+                report["sections"].append({
+                    "heading": "Conversation Export",
+                    "body": "No content could be extracted from the conversation.",
                     "bullets": []
                 })
 
@@ -454,12 +476,14 @@ class Filter:
         user_content = self._extract_text_content(last_user_msg.get("content", ""))
         export_format = self._detect_export_request(user_content)
 
-        if export_format:
-            self._log(f"Export request detected in inlet: {export_format.upper()}")
-            
-            # Generate the file and get a download link
-            report = self._build_report_from_conversation(messages, export_format)
-            export_result = self._create_export_with_link(report, export_format)
+            if export_format:
+                self._log(f"Export request detected in inlet: {export_format.upper()}")
+                self._log(f"Processing {len(messages)} messages for export")
+                
+                # Generate the file and get a download link
+                report = self._build_report_from_conversation(messages, export_format)
+                self._log(f"Report structure: title='{report.get('title')}', sections={len(report.get('sections', []))}")
+                export_result = self._create_export_with_link(report, export_format)
             
             if export_result and export_result.get("success"):
                 filename = export_result.get("filename", f"export.{export_format}")

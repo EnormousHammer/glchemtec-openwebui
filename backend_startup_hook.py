@@ -50,6 +50,53 @@ def add_export_proxy_routes(webui_app):
 
 # Auto-run on import - try to find OpenWebUI's app and add routes
 # This runs when OpenWebUI imports modules from /app/backend/
+def register_routes():
+    """Try multiple ways to register the routes."""
+    routes_added = False
+    
+    # Method 1: Try open_webui.api.app
+    try:
+        import open_webui.api.app as app_module
+        if hasattr(app_module, 'app'):
+            if add_export_proxy_routes(app_module.app):
+                print("[EXPORT-PROXY] ✅ Routes added via open_webui.api.app")
+                routes_added = True
+    except Exception as e:
+        print(f"[EXPORT-PROXY] Method 1 failed: {e}")
+    
+    # Method 2: Try open_webui.main
+    if not routes_added:
+        try:
+            import open_webui.main as main_module
+            if hasattr(main_module, 'app'):
+                if add_export_proxy_routes(main_module.app):
+                    print("[EXPORT-PROXY] ✅ Routes added via open_webui.main")
+                    routes_added = True
+        except Exception as e:
+            print(f"[EXPORT-PROXY] Method 2 failed: {e}")
+    
+    # Method 3: Try finding app in sys.modules
+    if not routes_added:
+        try:
+            import sys
+            for module_name in list(sys.modules.keys()):
+                if 'open_webui' in module_name and 'app' in module_name:
+                    module = sys.modules[module_name]
+                    if hasattr(module, 'app'):
+                        if add_export_proxy_routes(module.app):
+                            print(f"[EXPORT-PROXY] ✅ Routes added via {module_name}")
+                            routes_added = True
+                            break
+        except Exception as e:
+            print(f"[EXPORT-PROXY] Method 3 failed: {e}")
+    
+    if not routes_added:
+        print("[EXPORT-PROXY] ⚠️ Could not add routes - will retry on next import")
+
+# Try immediately
+register_routes()
+
+# Also try on import (in case OpenWebUI loads later)
 try:
     import open_webui.api.app as app_module
     if hasattr(app_module, 'app'):
