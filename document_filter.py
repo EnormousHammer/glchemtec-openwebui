@@ -48,7 +48,22 @@ class Filter:
         max_image_size_mb: float = Field(default=10.0, description="Max size per image (MB)")
 
     def __init__(self):
-        self.valves = self.Valves()
+        # CRITICAL: Always ensure valves exists, even if init fails
+        # This prevents OpenWebUI from crashing when introspecting filters
+        try:
+            self.valves = self.Valves()
+        except Exception as e:
+            # If initialization fails, disable the filter to prevent crashes
+            print(f"[DOCUMENT-FILTER] ERROR in __init__: {e}")
+            import traceback
+            print(f"[DOCUMENT-FILTER] Traceback: {traceback.format_exc()}")
+            # Create a minimal disabled filter - MUST succeed or OpenWebUI crashes
+            try:
+                self.valves = self.Valves(enabled=False)
+            except Exception as e2:
+                # Last resort - this should never happen
+                print(f"[DOCUMENT-FILTER] CRITICAL: Cannot create Valves - {e2}")
+                raise
 
     def _log(self, msg: str) -> None:
         if self.valves.debug:

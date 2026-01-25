@@ -62,7 +62,13 @@ class Filter:
             print(f"[SHAREPOINT-IMPORT] ERROR in __init__: {e}")
             import traceback
             print(f"[SHAREPOINT-IMPORT] Traceback: {traceback.format_exc()}")
-            self.valves = self.Valves(enabled=False)
+            # Create a minimal disabled filter - MUST succeed or OpenWebUI crashes
+            try:
+                self.valves = self.Valves(enabled=False)
+            except Exception as e2:
+                # Last resort - this should never happen
+                print(f"[SHAREPOINT-IMPORT] CRITICAL: Cannot create Valves - {e2}")
+                raise
         
         # Patterns to detect SharePoint import requests
         self.import_patterns = [

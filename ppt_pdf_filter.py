@@ -52,9 +52,25 @@ class Filter:
         convert_emf_wmf: bool = Field(default=True, description="Attempt EMF/WMF conversion")
 
     def __init__(self):
-        self.valves = self.Valves()
-        # Track processed files to avoid re-processing in same session
-        self._processed_files: Set[str] = set()
+        # CRITICAL: Always ensure valves exists, even if init fails
+        # This prevents OpenWebUI from crashing when introspecting filters
+        try:
+            self.valves = self.Valves()
+            # Track processed files to avoid re-processing in same session
+            self._processed_files: Set[str] = set()
+        except Exception as e:
+            # If initialization fails, disable the filter to prevent crashes
+            print(f"[PPT-PDF-VISION] ERROR in __init__: {e}")
+            import traceback
+            print(f"[PPT-PDF-VISION] Traceback: {traceback.format_exc()}")
+            # Create a minimal disabled filter - MUST succeed or OpenWebUI crashes
+            try:
+                self.valves = self.Valves(enabled=False)
+                self._processed_files: Set[str] = set()
+            except Exception as e2:
+                # Last resort - this should never happen
+                print(f"[PPT-PDF-VISION] CRITICAL: Cannot create Valves - {e2}")
+                raise
 
     def _log(self, msg: str) -> None:
         if self.valves.debug:

@@ -41,6 +41,8 @@ class Filter:
         sharepoint_folder: str = Field(default="Documents", description="SharePoint folder path")
 
     def __init__(self):
+        # CRITICAL: Always ensure valves exists, even if init fails
+        # This prevents OpenWebUI from crashing when introspecting filters
         try:
             # Get export service URL from env if set, otherwise use default
             export_url = os.environ.get("EXPORT_SERVICE_URL", "http://localhost:8000")
@@ -72,8 +74,14 @@ class Filter:
             print(f"[EXPORT-FILTER] ERROR in __init__: {e}")
             import traceback
             print(f"[EXPORT-FILTER] Traceback: {traceback.format_exc()}")
-            # Create a minimal disabled filter
-            self.valves = self.Valves(enabled=False)
+            # Create a minimal disabled filter - MUST succeed or OpenWebUI crashes
+            try:
+                self.valves = self.Valves(enabled=False)
+            except Exception as e2:
+                # Last resort - create with absolute minimum
+                print(f"[EXPORT-FILTER] CRITICAL: Cannot create Valves - {e2}")
+                # This should never happen, but if it does, we're in trouble
+                raise
         # Patterns to detect export requests - more flexible patterns
         self.export_patterns = [
             # PDF patterns - more flexible
