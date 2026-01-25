@@ -55,6 +55,31 @@ class Filter:
             # Force SharePoint export off regardless of env
             self.valves.enable_sharepoint = False
             
+            # Try to register export routes with OpenWebUI
+            try:
+                import sys
+                sys.path.insert(0, '/app/backend')
+                try:
+                    from export_route_handler import register_export_routes
+                    # Try to find OpenWebUI's app
+                    try:
+                        import open_webui.api.app as app_module
+                        if hasattr(app_module, 'app'):
+                            register_export_routes(app_module.app)
+                            self._log("✅ Export routes registered via open_webui.api.app")
+                    except:
+                        try:
+                            import open_webui.main as main_module
+                            if hasattr(main_module, 'app'):
+                                register_export_routes(main_module.app)
+                                self._log("✅ Export routes registered via open_webui.main")
+                        except:
+                            self._log("⚠️ Could not find OpenWebUI app to register routes (will retry on first request)")
+                except ImportError:
+                    self._log("⚠️ export_route_handler not found, routes may not be registered")
+            except Exception as e:
+                self._log(f"⚠️ Failed to register export routes: {e}")
+            
             # Test proxy connectivity on init (non-blocking, just a warning)
             try:
                 test_response = requests.get(f"{export_url}/health", timeout=2)
