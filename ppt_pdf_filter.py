@@ -30,8 +30,8 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
 
-        # Rendering quality
-        dpi: int = Field(default=300, description="DPI for PDF rendering (300 = good balance of quality/speed)")
+        # Rendering quality (high DPI for spectra clarity)
+        dpi: int = Field(default=600, description="DPI for PDF rendering (600 = high quality for spectra/NMR)")
         max_pages: int = Field(default=30, description="Max pages/slides to render")
         output_format: str = Field(default="png", description="png or jpeg")
         jpeg_quality: int = Field(default=85, description="JPEG quality if using jpeg")
@@ -39,10 +39,11 @@ class Filter:
         # Size limits
         max_total_image_mb: float = Field(default=50.0, description="Max total image payload (MB)")
         
-        # Timeouts
-        libreoffice_base_timeout: int = Field(default=120, description="Base LibreOffice timeout (sec)")
-        libreoffice_per_slide_timeout: int = Field(default=10, description="Additional seconds per slide")
-        max_timeout: int = Field(default=300, description="Maximum timeout cap (5 min)")
+        # Timeouts (balanced for speed and completeness)
+        libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
+        libreoffice_per_slide_timeout: int = Field(default=3, description="Additional seconds per slide")
+        max_timeout: int = Field(default=60, description="Maximum timeout cap (60s) - will try PDF conversion")
+        max_processing_time: int = Field(default=45, description="Max total processing time (sec) - return what we have even if PDF not done")
 
         # Features
         extract_text: bool = Field(default=True, description="Extract text/tables from PPTX")
@@ -148,6 +149,12 @@ class Filter:
     # =========================================================================
 
     def _find_libreoffice(self) -> Optional[str]:
+        """Find LibreOffice or unoconv for conversion."""
+        # Try unoconv first (faster, uses persistent listener)
+        unoconv = shutil.which("unoconv")
+        if unoconv:
+            return unoconv
+        # Fallback to direct LibreOffice
         return shutil.which("libreoffice") or shutil.which("soffice")
 
     def _count_slides(self, ppt_path: str) -> int:
@@ -165,7 +172,10 @@ class Filter:
             return 10
 
     def _convert_pptx_to_pdf(self, ppt_path: str, out_dir: str) -> Optional[str]:
-        """Convert PPTX to PDF using LibreOffice with dynamic timeout."""
+        """Convert PPTX to PDF using LibreOffice with optimizations and diagnostics."""
+        import time
+        start_time = time.time()
+        
         lo = self._find_libreoffice()
         if not lo:
             self._log("LibreOffice not found - skipping PDF conversion")
@@ -179,27 +189,54 @@ class Filter:
         )
         
         self._log(f"Converting PPTX ({slide_count} slides) with {timeout}s timeout")
+        self._log(f"File size: {os.path.getsize(ppt_path) / 1024 / 1024:.1f}MB")
 
         profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
         try:
             env = os.environ.copy()
             env["HOME"] = "/tmp"
             env["TMPDIR"] = "/tmp"
+            # Optimize LibreOffice performance
+            env["SAL_USE_VCLPLUGIN"] = "headless"  # Force headless rendering
+            env["SAL_DISABLE_OPENCL"] = "1"  # Disable OpenCL (can cause issues)
+            env["SAL_DISABLE_OPENGL"] = "1"  # Disable OpenGL (can cause issues)
 
+            # Use optimized LibreOffice flags with PDF export parameters for 600 DPI
+            # Format: pdf:impress_pdf_Export:{"MaxImageResolution":600,"ReduceImageResolution":false}
+            pdf_params = (
+                'pdf:impress_pdf_Export:'
+                '{"MaxImageResolution":{"type":"long","value":"600"},'
+                '"ReduceImageResolution":{"type":"boolean","value":"false"},'
+                '"UseLosslessCompression":{"type":"boolean","value":"true"}}'
+            )
+            
             cmd = [
-                lo, "--headless", "--nologo", "--nofirststartwizard",
+                lo,
+                "--headless",
+                "--nologo",
+                "--nofirststartwizard",
+                "--nodefault",  # Don't load default documents
+                "--nolockcheck",  # Skip lock file checking (faster)
                 f"-env:UserInstallation=file://{profile_dir}",
-                "--convert-to", "pdf",
+                "--convert-to", pdf_params,
                 "--outdir", out_dir,
                 ppt_path,
             ]
             
+            self._log(f"Starting LibreOffice conversion...")
+            conversion_start = time.time()
+            
             result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True, env=env)
+            
+            conversion_time = time.time() - conversion_start
+            self._log(f"LibreOffice conversion took {conversion_time:.1f}s (returncode: {result.returncode})")
             
             if result.returncode != 0:
                 self._log(f"LibreOffice error (code {result.returncode})")
                 if result.stderr:
                     self._log(f"stderr: {result.stderr[:500]}")
+                if result.stdout:
+                    self._log(f"stdout: {result.stdout[:500]}")
 
             # Find output PDF
             base = os.path.splitext(os.path.basename(ppt_path))[0]
@@ -231,7 +268,9 @@ class Filter:
     # =========================================================================
 
     def _convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
-        """Render PDF pages to images."""
+        """Render PDF pages to images with timing diagnostics."""
+        import time
+        start_time = time.time()
         paths = []
         try:
             from pdf2image import convert_from_path
@@ -240,18 +279,24 @@ class Filter:
             if fmt not in ("png", "jpeg", "jpg"):
                 fmt = "png"
 
-            self._log(f"Rendering PDF at {self.valves.dpi} DPI")
+            pdf_size = os.path.getsize(pdf_path) / 1024 / 1024
+            self._log(f"Rendering PDF at {self.valves.dpi} DPI (PDF size: {pdf_size:.1f}MB)")
 
+            render_start = time.time()
             images = convert_from_path(
                 pdf_path,
                 dpi=self.valves.dpi,
                 first_page=1,
                 last_page=self.valves.max_pages,
+                thread_count=1,  # Single thread to avoid memory issues
             )
+            render_time = time.time() - render_start
+            self._log(f"PDF2image conversion took {render_time:.1f}s for {len(images)} pages")
 
             max_bytes = int(self.valves.max_total_image_mb * 1024 * 1024)
             total_bytes = 0
 
+            save_start = time.time()
             for i, img in enumerate(images, start=1):
                 if fmt == "png":
                     out_path = os.path.join(output_dir, f"page_{i:03d}.png")
@@ -268,7 +313,10 @@ class Filter:
                     self._log(f"Size limit reached at page {i}")
                     break
 
+            save_time = time.time() - save_start
+            total_time = time.time() - start_time
             self._log(f"Rendered {len(paths)} pages ({total_bytes/1024/1024:.1f}MB)")
+            self._log(f"Timing: conversion={render_time:.1f}s, save={save_time:.1f}s, total={total_time:.1f}s")
 
         except Exception as e:
             self._log(f"PDF rendering error: {e}")
@@ -384,13 +432,13 @@ class Filter:
                             with open(temp_emf, 'wb') as dst:
                                 dst.write(src.read())
 
-                        # Try ImageMagick first
+                        # Try ImageMagick first (faster)
                         convert_cmd = shutil.which("convert") or shutil.which("magick")
                         if convert_cmd:
                             result = subprocess.run(
-                                [convert_cmd, "-density", "300", temp_emf, 
+                                [convert_cmd, "-density", str(self.valves.dpi), temp_emf, 
                                  "-background", "white", "-flatten", output_png],
-                                capture_output=True, timeout=30
+                                capture_output=True, timeout=15
                             )
                             if result.returncode == 0 and os.path.exists(output_png):
                                 paths.append(output_png)
@@ -411,7 +459,7 @@ class Filter:
                                     [lo, "--headless", "--nologo",
                                      f"-env:UserInstallation=file://{profile}",
                                      "--convert-to", "pdf", "--outdir", pdf_dir, temp_emf],
-                                    capture_output=True, timeout=30, env=env
+                                    capture_output=True, timeout=15, env=env
                                 )
 
                                 # Find PDF and convert to PNG
@@ -420,7 +468,7 @@ class Filter:
                                         pdf_path = os.path.join(pdf_dir, fn)
                                         try:
                                             from pdf2image import convert_from_path
-                                            imgs = convert_from_path(pdf_path, dpi=300, first_page=1, last_page=1)
+                                            imgs = convert_from_path(pdf_path, dpi=self.valves.dpi, first_page=1, last_page=1)
                                             if imgs:
                                                 imgs[0].save(output_png, format="PNG")
                                                 if os.path.exists(output_png):
@@ -519,36 +567,74 @@ class Filter:
                 is_pptx = file_name.endswith((".ppt", ".pptx"))
                 is_pdf = file_name.endswith(".pdf")
 
-                # PPTX processing
+                # PPTX processing - FAST PATH: extract text/images first, then try PDF
                 if is_pptx:
-                    # Extract text
+                    import time
+                    start_time = time.time()
+                    
+                    # Count slides for timeout calculation
+                    slide_count = self._count_slides(file_path)
+                    self._log(f"Processing PPTX: {slide_count} slides")
+                    
+                    # Extract text (FAST - always do this first)
                     text = self._extract_pptx_text(file_path)
                     if text:
                         all_text.append(f"=== {file_name} ===\n{text}")
                         self._log(f"Extracted text ({len(text)} chars)")
 
-                    # Extract embedded images
+                    # Extract embedded images (FAST - these are always available)
                     img_paths = self._extract_pptx_images(file_path, tmp)
+                    embedded_count = len(img_paths)
                     for p in img_paths:
                         url = self._to_data_url(p)
                         if url:
                             all_images.append({"type": "image_url", "image_url": {"url": url}})
+                    if embedded_count > 0:
+                        self._log(f"Extracted {embedded_count} embedded images")
 
-                    # Extract EMF/WMF
-                    emf_paths = self._extract_emf_wmf(file_path, tmp)
-                    for p in emf_paths:
-                        url = self._to_data_url(p)
-                        if url:
-                            all_images.append({"type": "image_url", "image_url": {"url": url}})
-
-                    # Convert to PDF for page rendering
-                    pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
-                    if pdf_path:
-                        page_paths = self._convert_pdf_to_images(pdf_path, tmp)
-                        for p in page_paths:
+                    # Extract EMF/WMF (moderate speed - try if we have time)
+                    elapsed = time.time() - start_time
+                    if elapsed < 20:  # Only do EMF if we have time
+                        emf_paths = self._extract_emf_wmf(file_path, tmp)
+                        emf_count = len(emf_paths)
+                        for p in emf_paths:
                             url = self._to_data_url(p)
                             if url:
                                 all_images.append({"type": "image_url", "image_url": {"url": url}})
+                        if emf_count > 0:
+                            self._log(f"Converted {emf_count} EMF/WMF images")
+                    else:
+                        self._log("Skipping EMF conversion - prioritizing PDF conversion")
+
+                    # Convert to PDF for page rendering (SLOW but important - try with timeout)
+                    elapsed = time.time() - start_time
+                    time_remaining = self.valves.max_processing_time - elapsed
+                    
+                    if time_remaining > 15:  # Need at least 15s for PDF conversion
+                        self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
+                        pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
+                        if pdf_path:
+                            elapsed = time.time() - start_time
+                            time_remaining = self.valves.max_processing_time - elapsed
+                            if time_remaining > 5:  # Need at least 5s for rendering
+                                self._log(f"Rendering PDF pages ({int(time_remaining)}s remaining)")
+                                page_paths = self._convert_pdf_to_images(pdf_path, tmp)
+                                page_count = len(page_paths)
+                                for p in page_paths:
+                                    url = self._to_data_url(p)
+                                    if url:
+                                        all_images.append({"type": "image_url", "image_url": {"url": url}})
+                                self._log(f"Rendered {page_count} PDF pages")
+                            else:
+                                self._log("Skipped PDF rendering - out of time (but have embedded images)")
+                        else:
+                            self._log("PDF conversion failed/timed out - continuing with embedded images")
+                    else:
+                        self._log(f"Skipped PDF conversion - not enough time ({int(time_remaining)}s remaining, need 15s+)")
+                        self._log(f"Returning with {embedded_count} embedded images and text")
+                    
+                    elapsed = time.time() - start_time
+                    self._log(f"Total processing time: {elapsed:.1f}s, {len(all_images)} total images")
 
                 # PDF processing
                 elif is_pdf:
