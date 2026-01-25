@@ -67,6 +67,13 @@ RUN set -e && \
     mkdir -p /app/backend/open_webui/static/branding /app/backend/open_webui/static/css && \
     # Set favicon to GLC icon
     cp /app/backend/open_webui/static/branding/GLC_icon.png /app/backend/open_webui/static/favicon.ico && \
+    # CRITICAL: Patch OpenWebUI's db.py to use WAL mode instead of DELETE (prevents database locks)
+    if [ -f /app/backend/open_webui/internal/db.py ]; then \
+        sed -i 's/PRAGMA journal_mode=DELETE/PRAGMA journal_mode=WAL/g' /app/backend/open_webui/internal/db.py && \
+        echo "✓ Patched OpenWebUI db.py to use WAL mode"; \
+    else \
+        echo "⚠️ WARNING: /app/backend/open_webui/internal/db.py not found"; \
+    fi && \
     if [ -f /app/backend/start.sh ]; then \
         cp /app/backend/start.sh /app/backend/start.sh.original && \
         printf '#!/bin/bash\nset -e\ncd /app\necho "=== Starting OpenAI Responses Proxy ==="\npython3 -m uvicorn openai_responses_proxy:app --host 0.0.0.0 --port 8000 2>&1 &\nPROXY_PID=$!\necho "Proxy started with PID: $PROXY_PID"\nsleep 3\nif ! kill -0 $PROXY_PID 2>/dev/null; then\n  echo "ERROR: Proxy process died immediately!"\n  wait $PROXY_PID 2>/dev/null || true\n  exit 1\nelse\n  echo "✓ Proxy is running (PID: $PROXY_PID)"\nfi\necho "=== Starting OpenWebUI ==="\npython3 /app/set_connection_on_startup.py > /tmp/connection_setup.log 2>&1 &\nexec bash /app/backend/start.sh.original "$@"\n' > /app/backend/start.sh && \
