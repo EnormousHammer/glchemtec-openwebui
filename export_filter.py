@@ -53,12 +53,18 @@ class Filter:
             # Force SharePoint export off regardless of env
             self.valves.enable_sharepoint = False
             
-            # Test proxy connectivity on init
+            # Test proxy connectivity on init (non-blocking, just a warning)
             try:
                 test_response = requests.get(f"{export_url}/health", timeout=2)
-                self._log(f"Export filter initialized - proxy reachable at {export_url}")
-            except:
-                self._log(f"WARNING: Export proxy may not be running at {export_url} - exports may fail")
+                if test_response.status_code == 200:
+                    self._log(f"Export filter initialized - proxy reachable at {export_url}")
+                else:
+                    self._log(f"WARNING: Export proxy at {export_url} returned {test_response.status_code}")
+            except requests.exceptions.ConnectionError:
+                self._log(f"WARNING: Cannot connect to export proxy at {export_url} - exports may fail")
+            except Exception:
+                # Health endpoint might not exist, that's okay
+                self._log(f"Export filter initialized (proxy: {export_url})")
             
             self._log(f"Export filter initialized (public_url: {public_url})")
         except Exception as e:
