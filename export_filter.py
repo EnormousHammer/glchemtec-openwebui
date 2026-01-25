@@ -197,6 +197,28 @@ class Filter:
             self._log(f"Export error: {e}")
             return None
     
+    def _create_export_with_link(self, report: Dict[str, Any], format_type: str) -> Optional[Dict[str, Any]]:
+        """Create export file and get a download link."""
+        try:
+            url = f"{self.valves.export_service_url}/v1/export/create"
+            self._log(f"Creating export with link from: {url}")
+            
+            response = requests.post(url, json={
+                "report": report,
+                "format": format_type
+            }, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                self._log(f"Export created: {result}")
+                return result
+            else:
+                self._log(f"Export creation failed: {response.status_code} - {response.text[:200]}")
+                return None
+        except Exception as e:
+            self._log(f"Export creation error: {e}")
+            return None
+    
     def _upload_to_sharepoint(self, file_path: str, filename: str) -> Optional[str]:
         """Upload file to SharePoint and return the sharepoint URL."""
         # SharePoint uploads are disabled
@@ -292,80 +314,56 @@ class Filter:
         if export_format:
             self._log(f"Export request detected in inlet: {export_format.upper()}")
             
-            # Generate the file NOW (before assistant responds)
-            # This way we can provide a download link that the assistant can reference
+            # Generate the file and get a download link
             report = self._build_report_from_conversation(messages, export_format)
-            file_bytes = self._generate_export_file(report, export_format)
+            export_result = self._create_export_with_link(report, export_format)
             
-            if file_bytes:
-                filename = f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format}"
+            if export_result and export_result.get("success"):
+                filename = export_result.get("filename", f"export.{export_format}")
+                file_id = export_result.get("file_id", "")
+                download_url = export_result.get("download_url", "")
+                file_size = export_result.get("size_bytes", 0)
+                file_size_kb = file_size // 1024
                 
-                # Save file to uploads directory
-                upload_dir = os.environ.get("UPLOAD_DIR", "/app/backend/data/uploads")
-                if not os.path.exists(upload_dir):
-                    for alt_dir in ["/app/uploads", "/app/data/uploads", "/tmp"]:
-                        if os.path.exists(alt_dir):
-                            upload_dir = alt_dir
-                            break
+                self._log(f"Export file created: {filename} (ID: {file_id}, {file_size_kb}KB)")
                 
-                file_path = os.path.join(upload_dir, filename)
-                try:
-                    with open(file_path, "wb") as f:
-                        f.write(file_bytes)
-                    self._log(f"Export file generated and saved in inlet: {file_path} ({len(file_bytes)} bytes)")
-                    
-                    # Upload to SharePoint if enabled
-                    sharepoint_url = None
-                    if self.valves.enable_sharepoint:
-                        sharepoint_url = self._upload_to_sharepoint(file_path, filename)
-                        if sharepoint_url:
-                            self._log(f"File uploaded to SharePoint: {sharepoint_url}")
-                    
-                    mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    file_size_kb = len(file_bytes) // 1024
-                    
-                    # Modify user message to include file info and instruction
-                    # This tells the assistant that a file has been generated and will be attached
-                    instruction = (
-                        f"\n\n[SYSTEM NOTE: The user requested to export this conversation to {export_format.upper()}. "
-                        f"The file has been generated: {filename} ({file_size_kb}KB) and will be attached to your response. "
-                        f"Please inform the user that the export file is ready for download. "
-                        f"The file is saved at: {file_path}]"
-                    )
-                    
-                    if isinstance(last_user_msg.get("content"), str):
-                        last_user_msg["content"] = user_content + instruction
-                    elif isinstance(last_user_msg.get("content"), list):
-                        last_msg_content = last_user_msg.get("content", [])
-                        if not isinstance(last_msg_content, list):
-                            last_msg_content = [{"type": "text", "text": user_content}]
-                        last_msg_content.append({
-                            "type": "text",
-                            "text": instruction
-                        })
-                        last_user_msg["content"] = last_msg_content
-                    
-                    # Store file info in body metadata for outlet to use
-                    # Store base64 separately - don't pass it in instruction to assistant
-                    if "metadata" not in body:
-                        body["metadata"] = {}
-                    if "export_file" not in body["metadata"]:
-                        body["metadata"]["export_file"] = {}
-                    body["metadata"]["export_file"] = {
-                        "path": file_path,
-                        "filename": filename,
-                        "format": export_format,
-                        "size": len(file_bytes),
-                        "mime_type": mime_type,
-                        "sharepoint_url": sharepoint_url if 'sharepoint_url' in locals() else None
-                    }
-                    
-                except Exception as e:
-                    self._log(f"Failed to save export file in inlet: {e}")
-                    import traceback
-                    self._log(f"Traceback: {traceback.format_exc()}")
+                # Build the full download URL
+                base_url = self.valves.export_service_url.rstrip("/")
+                full_download_url = f"{base_url}{download_url}"
+                
+                # Modify user message to tell assistant about the download link
+                instruction = (
+                    f"\n\n[SYSTEM NOTE: The user requested to export this conversation to {export_format.upper()}. "
+                    f"The file '{filename}' ({file_size_kb}KB) has been generated. "
+                    f"IMPORTANT: Include this EXACT clickable download link in your response:\n"
+                    f"**[📥 Download {filename}]({full_download_url})**\n"
+                    f"Tell the user to click the link to download their file.]"
+                )
+                
+                if isinstance(last_user_msg.get("content"), str):
+                    last_user_msg["content"] = user_content + instruction
+                elif isinstance(last_user_msg.get("content"), list):
+                    last_msg_content = last_user_msg.get("content", [])
+                    if not isinstance(last_msg_content, list):
+                        last_msg_content = [{"type": "text", "text": user_content}]
+                    last_msg_content.append({
+                        "type": "text",
+                        "text": instruction
+                    })
+                    last_user_msg["content"] = last_msg_content
+                
+                # Store export info in metadata for outlet
+                if "metadata" not in body:
+                    body["metadata"] = {}
+                body["metadata"]["export_file"] = {
+                    "filename": filename,
+                    "file_id": file_id,
+                    "download_url": full_download_url,
+                    "format": export_format,
+                    "size": file_size
+                }
             else:
-                self._log("Failed to generate export file in inlet")
+                self._log("Failed to create export file in inlet")
 
         return body
 
@@ -416,148 +414,53 @@ class Filter:
                     self._log(f"Export request detected in outlet (fallback): {export_format.upper()}")
                     # Generate file now (fallback if inlet didn't run)
                     report = self._build_report_from_conversation(messages, export_format)
-                    file_bytes = self._generate_export_file(report, export_format)
+                    export_result = self._create_export_with_link(report, export_format)
                     
-                    if file_bytes:
-                        filename = f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format}"
-                        upload_dir = os.environ.get("UPLOAD_DIR", "/app/backend/data/uploads")
-                        if not os.path.exists(upload_dir):
-                            for alt_dir in ["/app/uploads", "/app/data/uploads", "/tmp"]:
-                                if os.path.exists(alt_dir):
-                                    upload_dir = alt_dir
-                                    break
-                        
-                        file_path = os.path.join(upload_dir, filename)
-                        try:
-                            with open(file_path, "wb") as f:
-                                f.write(file_bytes)
-                            self._log(f"Export file saved (fallback): {file_path}")
-                            mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            export_file_info = {
-                                "path": file_path,
-                                "filename": filename,
-                                "format": export_format,
-                                "size": len(file_bytes),
-                                "mime_type": mime_type
-                            }
-                        except Exception as e:
-                            self._log(f"Failed to save file in outlet fallback: {e}")
+                    if export_result and export_result.get("success"):
+                        base_url = self.valves.export_service_url.rstrip("/")
+                        export_file_info = {
+                            "filename": export_result.get("filename", f"export.{export_format}"),
+                            "file_id": export_result.get("file_id", ""),
+                            "download_url": f"{base_url}{export_result.get('download_url', '')}",
+                            "format": export_format,
+                            "size": export_result.get("size_bytes", 0)
+                        }
+                        self._log(f"Export file created (fallback): {export_file_info['filename']}")
         
-        # If we have file info (from inlet or fallback), enhance the assistant message
+        # If we have file info (from inlet), ensure download link is in the response
         if export_file_info and messages:
             last_msg = messages[-1]
             filename = export_file_info.get("filename", "export_file")
-            file_path = export_file_info.get("path", "")
+            download_url = export_file_info.get("download_url", "")
             export_format = export_file_info.get("format", "pdf")
             file_size = export_file_info.get("size", 0)
+            file_size_kb = file_size // 1024 if file_size else 0
             
-            # Attach file to assistant message so it appears as downloadable attachment (like ChatGPT)
-            if file_path and os.path.exists(file_path):
-                mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                file_size_kb = file_size // 1024 if file_size else 0
-                # Build a data URL download link (best-effort, suitable for small files)
-                download_link = None
-                try:
-                    with open(file_path, "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode("utf-8")
-                    download_link = f"[Download {filename} ({file_size_kb} KB)](data:{mime_type};base64,{b64})"
-                except Exception as e:
-                    self._log(f"Failed to build data URL download link: {e}")
-                
-                # Create file attachment object that OpenWebUI recognizes
-                file_attachment = {
-                    "file": {
-                        "path": file_path,
-                        "name": filename,
-                        "size": file_size,
-                        "type": mime_type,
-                        "meta": {
-                            "filename": filename,
-                            "size": file_size,
-                            "mime_type": mime_type
-                        }
-                    }
-                }
-                
-                # Attach file to the assistant message
-                if "files" not in last_msg:
-                    last_msg["files"] = []
-                if not isinstance(last_msg["files"], list):
-                    last_msg["files"] = []
-                
-                # Check if file is already attached (avoid duplicates)
-                file_already_attached = False
-                for existing_file in last_msg["files"]:
-                    if isinstance(existing_file, dict):
-                        existing_path = existing_file.get("file", {}).get("path", "") if isinstance(existing_file.get("file"), dict) else existing_file.get("path", "")
-                        if existing_path == file_path:
-                            file_already_attached = True
-                            break
-                
-                if not file_already_attached:
-                    last_msg["files"].append(file_attachment)
-                    self._log(f"Attached export file to assistant message: {filename}")
-                
-                # Also add to attachments array (some OpenWebUI versions use this)
-                if "attachments" not in last_msg:
-                    last_msg["attachments"] = []
-                if not isinstance(last_msg["attachments"], list):
-                    last_msg["attachments"] = []
-                
-                # Check if already in attachments
-                attachment_exists = False
-                for existing_att in last_msg["attachments"]:
-                    if isinstance(existing_att, dict):
-                        existing_path = existing_att.get("file", {}).get("path", "") if isinstance(existing_att.get("file"), dict) else existing_att.get("path", "")
-                        if existing_path == file_path:
-                            attachment_exists = True
-                            break
-                
-                if not attachment_exists:
-                    last_msg["attachments"].append(file_attachment)
-                
-                # Add a clean text note about the export (without embedding base64)
+            if download_url:
                 content = self._extract_text_content(last_msg.get("content", ""))
                 branding = self._get_branding_config()
                 icon = self._get_document_icon(export_format)
                 
-                # Check if content already mentions the file
-                if filename.lower() not in content.lower():
+                # Check if the download link is already in the response
+                if download_url not in content:
+                    # Add the download link
                     export_note = (
-                        f"\n\n{icon} **Export Ready**: I've generated a professional {export_format.upper()} document '{filename}' ({file_size_kb}KB) "
-                        f"with {branding['company_name']} branding. You can download it using the attachment below."
+                        f"\n\n---\n"
+                        f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
+                        f"**[📥 Click here to download {filename}]({download_url})**\n\n"
+                        f"*File size: {file_size_kb}KB | Generated by {branding['company_name']}*"
                     )
                     
-                    # Add SharePoint link if uploaded
-                    export_file_info = body.get("metadata", {}).get("export_file", {})
-                    sharepoint_url = export_file_info.get("sharepoint_url")
-                    if sharepoint_url:
-                        export_note += f"\n\n☁️ **SharePoint**: Document uploaded to [SharePoint]({sharepoint_url})"
-                    elif self.valves.enable_sharepoint and self.valves.sharepoint_site_url:
-                        export_note += f"\n\n☁️ **SharePoint**: Upload to SharePoint available (configure credentials to enable)"
-                    
                     if isinstance(last_msg.get("content"), str):
-                        last_msg["content"] = content + export_note + (f"\n\n{download_link}" if download_link else "")
+                        last_msg["content"] = content + export_note
                     elif isinstance(last_msg.get("content"), list):
-                        # Clean any text blocks that contain long base64
-                        cleaned_content = []
-                        for item in last_msg["content"]:
-                            if isinstance(item, dict) and item.get("type") == "text":
-                                text = item.get("text", "")
-                                # Remove long base64 strings if present
-                                if len(text) > 10000 and "base64," in text:
-                                    # Replace with a short message
-                                    item["text"] = f"Export file '{filename}' is ready for download."
-                            cleaned_content.append(item)
-                        last_msg["content"] = cleaned_content
                         last_msg["content"].append({
                             "type": "text",
-                            "text": export_note + (f"\n\n{download_link}" if download_link else "")
+                            "text": export_note
                         })
                     
-                    self._log(f"Enhanced assistant message with file attachment: {filename}")
+                    self._log(f"Added download link to response: {download_url}")
                 else:
-                    # Content already mentions the file, just ensure file is attached
-                    self._log(f"File already mentioned in content, attachment added: {filename}")
+                    self._log(f"Download link already in response: {filename}")
 
         return body

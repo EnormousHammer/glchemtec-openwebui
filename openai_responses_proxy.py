@@ -1884,6 +1884,9 @@ async def openai_tts(text: str, voice: str = "alloy", model: str = "tts-1") -> b
 
 
 
+# Temporary file storage for exports (in-memory, cleared periodically)
+EXPORT_FILES: Dict[str, Dict[str, Any]] = {}
+
 @app.post("/v1/report/pdf")
 async def generate_report_pdf(report: dict):
     """Generate a PDF report from structured JSON."""
@@ -1914,6 +1917,81 @@ async def generate_report_docx(report: dict):
     return StreamingResponse(
         io.BytesIO(docx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/v1/export/create")
+async def create_export_file(request: Request):
+    """
+    Create an export file and return a download link.
+    Returns JSON with download_url that can be clicked directly.
+    """
+    try:
+        data = await request.json()
+        report = data.get("report", {})
+        format_type = data.get("format", "pdf").lower()
+        
+        if format_type == "pdf":
+            file_bytes = render_report_pdf(report)
+            mime_type = "application/pdf"
+            ext = "pdf"
+        elif format_type in ["docx", "word"]:
+            file_bytes = render_report_docx(report)
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ext = "docx"
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported format: {format_type}")
+        
+        # Generate unique file ID
+        file_id = str(uuid.uuid4())[:8]
+        filename = _safe_slug(report.get("title", "export")) + f".{ext}"
+        
+        # Store in memory (will be cleared after download or timeout)
+        EXPORT_FILES[file_id] = {
+            "bytes": file_bytes,
+            "filename": filename,
+            "mime_type": mime_type,
+            "created": time.time()
+        }
+        
+        # Clean old files (older than 1 hour)
+        cutoff = time.time() - 3600
+        for fid in list(EXPORT_FILES.keys()):
+            if EXPORT_FILES[fid].get("created", 0) < cutoff:
+                del EXPORT_FILES[fid]
+        
+        log(f"Export file created: {filename} (ID: {file_id}, {len(file_bytes)} bytes)")
+        
+        return JSONResponse({
+            "success": True,
+            "file_id": file_id,
+            "filename": filename,
+            "size_bytes": len(file_bytes),
+            "download_url": f"/v1/export/download/{file_id}"
+        })
+        
+    except Exception as e:
+        log(f"Export creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/export/download/{file_id}")
+async def download_export_file(file_id: str):
+    """Download a previously created export file."""
+    if file_id not in EXPORT_FILES:
+        raise HTTPException(status_code=404, detail="File not found or expired")
+    
+    file_data = EXPORT_FILES[file_id]
+    filename = file_data["filename"]
+    mime_type = file_data["mime_type"]
+    file_bytes = file_data["bytes"]
+    
+    log(f"Export file downloaded: {filename} (ID: {file_id})")
+    
+    return StreamingResponse(
+        io.BytesIO(file_bytes),
+        media_type=mime_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
