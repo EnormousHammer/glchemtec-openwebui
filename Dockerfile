@@ -61,6 +61,8 @@ COPY set_connection_on_startup.py /app/set_connection_on_startup.py
 COPY fix_database_wal.py /app/fix_database_wal.py
 COPY backend_startup_hook.py /app/backend/backend_startup_hook.py
 COPY register_export_routes.py /app/register_export_routes.py
+COPY export_route_handler.py /app/backend/export_route_handler.py
+COPY export_route_handler.py /app/backend/custom/export_route_handler.py
 
 # Modify OpenWebUI's startup script to start proxy first
 # Use printf instead of heredoc - more reliable in Dockerfile RUN commands
