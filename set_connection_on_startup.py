@@ -56,7 +56,8 @@ def enforce_connection():
     
     try:
         # Use WAL mode for better concurrency (allows concurrent reads)
-        conn = sqlite3.connect(str(DB_FILE), timeout=5.0)  # 5 second timeout
+        # Increase timeout and use check_same_thread=False to avoid locks
+        conn = sqlite3.connect(str(DB_FILE), timeout=10.0, check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging for concurrency
         cursor = conn.cursor()
         
@@ -164,16 +165,15 @@ def main():
         print(f"[CONFIG] Database not found after 60s")
         return
     
-    # Wait for table
-    time.sleep(5)
+    # Wait longer for OpenWebUI to finish initializing database
+    time.sleep(10)
     
-    # Set initial connection
+    # Set initial connection once
     enforce_connection()
     
-    # Run continuously - check every 5 minutes to prevent resets (reduced frequency to avoid blocking)
-    while True:
-        time.sleep(300)  # Check every 5 minutes (reduced from 2 to avoid database contention)
-        enforce_connection()
+    # Don't run continuously - just set it once at startup
+    # Running continuously causes database locks
+    print("[CONFIG] Connection set once at startup - not running continuously to avoid locks")
 
 if __name__ == "__main__":
     try:
