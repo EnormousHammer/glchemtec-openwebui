@@ -710,7 +710,21 @@ class Filter:
                             self._log(f"PDF conversion failed/timed out after {elapsed:.1f}s - continuing with embedded images")
                     else:
                         self._log(f"Skipped PDF conversion - not enough time ({int(time_remaining)}s remaining, need ~{int(total_pdf_time_needed)}s)")
-                        self._log(f"Returning with {embedded_count} embedded images and text")
+                        # If PDF conversion skipped, try embedded images as fallback
+                        if time_remaining > 10:
+                            img_paths = self._extract_pptx_images(file_path, tmp)
+                            embedded_count = len(img_paths)
+                            max_embedded = min(15, embedded_count)
+                            if embedded_count > max_embedded:
+                                img_paths = img_paths[:max_embedded]
+                            
+                            for p in img_paths:
+                                url = self._to_data_url(p, max_size_mb=2.0)
+                                if url:
+                                    all_images.append({"type": "image_url", "image_url": {"url": url}})
+                            if embedded_count > 0:
+                                self._log(f"Extracted {len(img_paths)}/{embedded_count} embedded images as fallback")
+                        self._log(f"Returning with {len(all_images)} embedded images and text")
                     
                     # Extract EMF/WMF (LOWEST PRIORITY - do AFTER PDF conversion)
                     # EMF conversion is slow but useful - do it if we have time after PDF
@@ -735,6 +749,38 @@ class Filter:
                             self._log(f"Skipping EMF conversion - PDF conversion should complete first")
                         else:
                             self._log(f"Skipping EMF conversion - not enough time ({int(time_remaining)}s remaining, need 20s+)")
+                    
+                    # Extract embedded images AFTER PDF conversion (if time permits)
+                    # These are lower priority than PDF pages but still useful
+                    elapsed = time.time() - start_time
+                    time_remaining = self.valves.max_processing_time - elapsed
+                    
+                    embedded_count = 0
+                    if time_remaining > 10:  # Need at least 10s for embedded image extraction
+                        img_paths = self._extract_pptx_images(file_path, tmp)
+                        embedded_count = len(img_paths)
+                        max_embedded = min(15, embedded_count)  # Limit to 15 for speed
+                        if embedded_count > max_embedded:
+                            self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent timeout")
+                            img_paths = img_paths[:max_embedded]
+                        
+                        encoded_embedded = 0
+                        for i, p in enumerate(img_paths):
+                            # Check time every few images
+                            if i > 0 and i % 5 == 0:
+                                elapsed = time.time() - start_time
+                                if elapsed > self.valves.max_processing_time - 10:
+                                    self._log(f"Stopping embedded image extraction - {int(self.valves.max_processing_time - elapsed)}s before timeout")
+                                    break
+                            
+                            url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
+                            if url:
+                                all_images.append({"type": "image_url", "image_url": {"url": url}})
+                                encoded_embedded += 1
+                        if encoded_embedded > 0:
+                            self._log(f"Extracted {encoded_embedded}/{embedded_count} embedded images")
+                    else:
+                        self._log(f"Skipping embedded image extraction - only {int(time_remaining)}s remaining")
                     
                     elapsed = time.time() - start_time
                     self._log(f"Total processing time: {elapsed:.1f}s, {len(all_images)} total images")
