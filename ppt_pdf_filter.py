@@ -677,16 +677,16 @@ class Filter:
                         self.valves.libreoffice_base_timeout + (slide_count * self.valves.libreoffice_per_slide_timeout),
                         self.valves.max_timeout
                     )
-                    # More realistic render time estimate: ~2-3s per page for 600 DPI
-                    render_time_needed = max(5, slide_count * 2)  # At least 5s, or 2s per slide
-                    total_pdf_time_needed = pdf_timeout_needed + render_time_needed + 10  # Add 10s buffer for safety
+                    # More realistic render time estimate: ~1.5s per page for 600 DPI (optimized)
+                    render_time_needed = max(5, slide_count * 1.5)  # At least 5s, or 1.5s per slide
+                    total_pdf_time_needed = pdf_timeout_needed + render_time_needed + 5  # Reduced buffer to 5s
                     
                     self._log(f"Time check: {int(time_remaining)}s remaining, need ~{int(total_pdf_time_needed)}s for PDF (conversion: {int(pdf_timeout_needed)}s, render: {int(render_time_needed)}s)")
                     
                     pdf_pages_rendered = 0  # Track if PDF conversion succeeded
                     
-                    # Try PDF conversion if we have at least 80% of needed time (more lenient)
-                    if time_remaining > (total_pdf_time_needed * 0.8):
+                    # Try PDF conversion if we have at least 60% of needed time (more lenient - allows processing even if tight)
+                    if time_remaining > (total_pdf_time_needed * 0.6):
                         self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
                         pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
                         if pdf_path:
