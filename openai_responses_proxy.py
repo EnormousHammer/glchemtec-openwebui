@@ -2032,12 +2032,22 @@ async def download_export_file(file_id: str):
     mime_type = file_data["mime_type"]
     file_bytes = file_data["bytes"]
     
-    log(f"Export file downloaded: {filename} (ID: {file_id})")
+    log(f"Export file downloaded: {filename} (ID: {file_id}, {len(file_bytes):,} bytes)")
+    
+    # Force download with proper headers
+    # Use 'attachment' to force download instead of opening in browser
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": mime_type,
+        "Content-Length": str(len(file_bytes)),
+        # Prevent browser from opening PDF in new tab
+        "X-Content-Type-Options": "nosniff"
+    }
     
     return StreamingResponse(
         io.BytesIO(file_bytes),
         media_type=mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers=headers,
     )
 
 
