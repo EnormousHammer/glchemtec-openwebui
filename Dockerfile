@@ -58,9 +58,7 @@ COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-t
 COPY start.sh /app/start.sh
 COPY set_default_connection.py /app/set_default_connection.py
 COPY set_connection_on_startup.py /app/set_connection_on_startup.py
-COPY setup_export_proxy_route.py /app/setup_export_proxy_route.py
 COPY backend_startup_hook.py /app/backend/backend_startup_hook.py
-COPY patch_webui_app.py /app/patch_webui_app.py
 
 # Modify OpenWebUI's startup script to start proxy first
 # Use printf instead of heredoc - more reliable in Dockerfile RUN commands
