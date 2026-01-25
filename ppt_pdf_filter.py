@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 10.1
-description: PPT/PPTX -> PDF (LibreOffice) -> high-DPI PNG pages for vision + PDF vision. Extracts EMF/WMF images. Optimized for spectra (NMR/HPLC) clarity.
+version: 11.0
+description: Processes PPT/PPTX/PDF files for vision analysis. Only processes files in the CURRENT message - ignores conversation history.
 """
 
 import os
@@ -11,13 +11,14 @@ import tempfile
 import shutil
 import subprocess
 import zipfile
-from typing import Optional, List, Dict, Any
+import hashlib
+from typing import Optional, List, Dict, Any, Set
 
 from pydantic import BaseModel, Field
 
 # Optional: local PPTX text/table extraction
 try:
-    from pptx import Presentation  # type: ignore
+    from pptx import Presentation
     PPTX_AVAILABLE = True
 except Exception:
     PPTX_AVAILABLE = False
@@ -29,40 +30,44 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
 
-        # ===== Rendering quality (CRITICAL) =====
-        # Use higher DPI to keep fine spectra labels legible.
-        dpi: int = Field(default=600, description="DPI for PDF rendering (600 for spectra/NMR clarity)")
-        # Allow more slides by default to avoid truncating longer decks.
-        max_pages: int = Field(default=30, description="Max pages/slides to render as images")
+        # Rendering quality
+        dpi: int = Field(default=300, description="DPI for PDF rendering (300 = good balance of quality/speed)")
+        max_pages: int = Field(default=30, description="Max pages/slides to render")
+        output_format: str = Field(default="png", description="png or jpeg")
+        jpeg_quality: int = Field(default=85, description="JPEG quality if using jpeg")
 
-        # Output format: PNG is best for small text/spectra (lossless)
-        output_format: str = Field(default="png", description="png (recommended) or jpeg")
-        jpeg_quality: int = Field(default=92, description="JPEG quality if output_format=jpeg")
-
-        # Size & safety limits (prevents huge payloads) — bumped to avoid cutting pages at higher DPI
-        max_total_image_mb: float = Field(default=64.0, description="Max total base64 image payload (MB)")
-        # If you truly need unlimited, raise max_total_image_mb, but keep an eye on API payload limits.
+        # Size limits
+        max_total_image_mb: float = Field(default=50.0, description="Max total image payload (MB)")
         
-        # PPTX pipeline
-        render_pptx_via_pdf: bool = Field(default=True, description="Convert PPTX -> PDF then render pages (best fidelity)")
-        libreoffice_timeout_sec: int = Field(default=60, description="LibreOffice timeout (sec) - allow larger decks to finish")
+        # Timeouts
+        libreoffice_base_timeout: int = Field(default=120, description="Base LibreOffice timeout (sec)")
+        libreoffice_per_slide_timeout: int = Field(default=10, description="Additional seconds per slide")
+        max_timeout: int = Field(default=300, description="Maximum timeout cap (5 min)")
 
-        # Include PPTX extracted text/tables (helpful for copyable content)
-        include_pptx_text: bool = Field(default=True, description="Extract slide text/tables via python-pptx (if available)")
+        # Features
+        extract_text: bool = Field(default=True, description="Extract text/tables from PPTX")
+        extract_embedded_images: bool = Field(default=True, description="Extract PNG/JPG images from PPTX")
+        convert_emf_wmf: bool = Field(default=True, description="Attempt EMF/WMF conversion")
 
     def __init__(self):
         self.valves = self.Valves()
+        # Track processed files to avoid re-processing in same session
+        self._processed_files: Set[str] = set()
 
     def _log(self, msg: str) -> None:
         if self.valves.debug:
             print(f"[PPT-PDF-VISION] {msg}")
 
-    # -------------------------
-    # OpenWebUI file discovery
-    # -------------------------
+    # =========================================================================
+    # FILE DISCOVERY - Only current message, not history
+    # =========================================================================
+    
     def _get_file_path(self, file_obj: Dict[str, Any]) -> str:
+        """Extract file path from various OpenWebUI file object formats."""
         if not isinstance(file_obj, dict):
             return ""
+        
+        # Nested file object
         if isinstance(file_obj.get("file"), dict):
             f = file_obj["file"]
             path = (f.get("path") or "").strip()
@@ -70,69 +75,110 @@ class Filter:
                 return path
             if isinstance(f.get("meta"), dict):
                 return (f["meta"].get("path") or "").strip()
+        
+        # Direct path
         return (file_obj.get("path") or "").strip()
 
     def _get_file_name(self, file_obj: Dict[str, Any]) -> str:
+        """Extract filename from file object."""
         if not isinstance(file_obj, dict):
             return ""
+        
         if isinstance(file_obj.get("file"), dict):
             f = file_obj["file"]
             name = f.get("filename") or f.get("name") or ""
             if not name and isinstance(f.get("meta"), dict):
                 name = f["meta"].get("name") or ""
             return (name or "").lower().strip()
-        return ((file_obj.get("name") or file_obj.get("filename") or "")).lower().strip()
+        
+        return (file_obj.get("name") or file_obj.get("filename") or "").lower().strip()
 
-    def _extract_all_files(self, body: dict, messages: list) -> List[Dict[str, Any]]:
-        all_files: List[Dict[str, Any]] = []
+    def _get_file_id(self, file_obj: Dict[str, Any]) -> str:
+        """Get unique file ID for tracking."""
+        if isinstance(file_obj.get("file"), dict):
+            f = file_obj["file"]
+            return f.get("id") or f.get("path") or ""
+        return file_obj.get("id") or file_obj.get("path") or ""
 
+    def _get_current_message_files(self, body: dict, messages: list) -> List[Dict[str, Any]]:
+        """
+        Get files from CURRENT message only.
+        This is the key to not re-processing old files.
+        """
+        files: List[Dict[str, Any]] = []
+        
+        # Files in request body (current upload)
         if isinstance(body.get("files"), list):
-            all_files.extend(body["files"])
-
-        for msg in messages:
-            if isinstance(msg.get("files"), list):
-                all_files.extend(msg["files"])
-            if isinstance(msg.get("attachments"), list):
-                all_files.extend(msg["attachments"])
-            if isinstance(msg.get("sources"), list):
-                for source_obj in msg["sources"]:
-                    if isinstance(source_obj, dict):
-                        source = source_obj.get("source", {})
-                        if source.get("type") == "file" and isinstance(source.get("file"), dict):
-                            all_files.append({"file": source["file"]})
-
-        # Dedup by path
+            files.extend(body["files"])
+        
+        # Files in the last message (if it's a user message with attachments)
+        if messages:
+            last_msg = messages[-1]
+            if last_msg.get("role") == "user":
+                if isinstance(last_msg.get("files"), list):
+                    files.extend(last_msg["files"])
+                if isinstance(last_msg.get("attachments"), list):
+                    files.extend(last_msg["attachments"])
+        
+        # Deduplicate by path
         seen = set()
         unique = []
-        for f in all_files:
-            p = self._get_file_path(f)
-            if p and p not in seen:
-                seen.add(p)
+        for f in files:
+            path = self._get_file_path(f)
+            if path and path not in seen:
+                seen.add(path)
                 unique.append(f)
+        
         return unique
 
-    def _extract_text_content(self, content: Any) -> str:
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            parts = []
-            for item in content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    parts.append(item.get("text", ""))
-            return "\n".join([p for p in parts if p]).strip()
-        return str(content) if content else ""
+    def _is_supported_file(self, file_name: str) -> bool:
+        """Check if file type is supported by this filter."""
+        return file_name.endswith((".ppt", ".pptx", ".pdf"))
 
-    # -------------------------
-    # PPTX -> PDF (LibreOffice)
-    # -------------------------
+    def _file_hash(self, file_path: str) -> str:
+        """Generate hash of file for dedup tracking."""
+        try:
+            with open(file_path, "rb") as f:
+                return hashlib.md5(f.read(8192)).hexdigest()  # First 8KB
+        except:
+            return file_path
+
+    # =========================================================================
+    # LIBREOFFICE CONVERSION
+    # =========================================================================
+
     def _find_libreoffice(self) -> Optional[str]:
         return shutil.which("libreoffice") or shutil.which("soffice")
 
-    def convert_pptx_to_pdf(self, ppt_path: str, out_dir: str) -> Optional[str]:
+    def _count_slides(self, ppt_path: str) -> int:
+        """Count slides for timeout calculation."""
+        try:
+            if PPTX_AVAILABLE:
+                prs = Presentation(ppt_path)
+                return len(prs.slides)
+            else:
+                with zipfile.ZipFile(ppt_path, 'r') as z:
+                    slides = [f for f in z.namelist() 
+                             if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
+                    return len(slides)
+        except:
+            return 10
+
+    def _convert_pptx_to_pdf(self, ppt_path: str, out_dir: str) -> Optional[str]:
+        """Convert PPTX to PDF using LibreOffice with dynamic timeout."""
         lo = self._find_libreoffice()
         if not lo:
-            self._log("❌ LibreOffice not found (libreoffice/soffice). PPTX->PDF disabled.")
+            self._log("LibreOffice not found - skipping PDF conversion")
             return None
+
+        # Calculate timeout based on slide count
+        slide_count = self._count_slides(ppt_path)
+        timeout = min(
+            self.valves.libreoffice_base_timeout + (slide_count * self.valves.libreoffice_per_slide_timeout),
+            self.valves.max_timeout
+        )
+        
+        self._log(f"Converting PPTX ({slide_count} slides) with {timeout}s timeout")
 
         profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
         try:
@@ -141,341 +187,290 @@ class Filter:
             env["TMPDIR"] = "/tmp"
 
             cmd = [
-                lo,
-                "--headless",
-                "--nologo",
-                "--nofirststartwizard",
+                lo, "--headless", "--nologo", "--nofirststartwizard",
                 f"-env:UserInstallation=file://{profile_dir}",
                 "--convert-to", "pdf",
                 "--outdir", out_dir,
                 ppt_path,
             ]
-            self._log(f"Running LibreOffice PPTX->PDF: {os.path.basename(ppt_path)} (timeout: {self.valves.libreoffice_timeout_sec}s)")
-            r = subprocess.run(
-                cmd,
-                timeout=self.valves.libreoffice_timeout_sec,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            self._log(f"LibreOffice conversion completed (returncode: {r.returncode})")
-            if r.returncode != 0:
-                self._log(f"LibreOffice returned {r.returncode}")
-                if r.stderr:
-                    self._log(f"LibreOffice stderr: {r.stderr[:800]}")
-                if r.stdout:
-                    self._log(f"LibreOffice stdout: {r.stdout[:800]}")
+            
+            result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True, env=env)
+            
+            if result.returncode != 0:
+                self._log(f"LibreOffice error (code {result.returncode})")
+                if result.stderr:
+                    self._log(f"stderr: {result.stderr[:500]}")
 
+            # Find output PDF
             base = os.path.splitext(os.path.basename(ppt_path))[0]
             expected = os.path.join(out_dir, base + ".pdf")
             if os.path.exists(expected):
                 return expected
 
-            # Fallback: first PDF found
             for fn in os.listdir(out_dir):
                 if fn.lower().endswith(".pdf"):
                     return os.path.join(out_dir, fn)
 
-            self._log("❌ PPTX->PDF produced no PDF file.")
             return None
+
         except subprocess.TimeoutExpired:
-            self._log(f"❌ LibreOffice conversion timed out after {self.valves.libreoffice_timeout_sec}s. Killing immediately...")
-            # Kill processes immediately - no waiting
+            self._log(f"LibreOffice timed out after {timeout}s - killing process")
             try:
-                # Force kill immediately
-                subprocess.run(["pkill", "-9", "-f", "soffice"], timeout=1, capture_output=True)
-                subprocess.run(["pkill", "-9", "-f", "libreoffice"], timeout=1, capture_output=True)
-                # Also try killing by PID if we can find it
-                subprocess.run(["killall", "-9", "soffice"], timeout=1, capture_output=True)
-                subprocess.run(["killall", "-9", "libreoffice"], timeout=1, capture_output=True)
+                subprocess.run(["pkill", "-9", "-f", "soffice"], timeout=2, capture_output=True)
             except:
                 pass
             return None
         except Exception as e:
-            self._log(f"❌ PPTX->PDF error: {type(e).__name__}: {e}")
+            self._log(f"Conversion error: {e}")
             return None
         finally:
             shutil.rmtree(profile_dir, ignore_errors=True)
 
-    # -------------------------
-    # PDF -> high-DPI images
-    # -------------------------
-    def convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
-        """
-        Render PDF pages to images using pdf2image.
-        Default output is PNG (lossless) at high DPI for spectra clarity.
-        """
-        paths: List[str] = []
-        try:
-            from pdf2image import convert_from_path  # type: ignore
+    # =========================================================================
+    # PDF TO IMAGES
+    # =========================================================================
 
-            fmt = (self.valves.output_format or "png").lower().strip()
+    def _convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
+        """Render PDF pages to images."""
+        paths = []
+        try:
+            from pdf2image import convert_from_path
+
+            fmt = self.valves.output_format.lower()
             if fmt not in ("png", "jpeg", "jpg"):
                 fmt = "png"
 
-            max_pages = max(1, int(self.valves.max_pages))
-            dpi = max(72, int(self.valves.dpi))
+            self._log(f"Rendering PDF at {self.valves.dpi} DPI")
 
-            self._log(f"PDF->Images: dpi={dpi}, max_pages={max_pages}, fmt={fmt}")
-
-            # Convert pages (PIL Images in memory)
             images = convert_from_path(
                 pdf_path,
-                dpi=dpi,
-                fmt="png" if fmt == "png" else "ppm",  # convert_from_path expects fmt; we'll save ourselves
+                dpi=self.valves.dpi,
                 first_page=1,
-                last_page=max_pages,
+                last_page=self.valves.max_pages,
             )
 
-            max_total_bytes = int(float(self.valves.max_total_image_mb) * 1024 * 1024)
-            running_bytes = 0
+            max_bytes = int(self.valves.max_total_image_mb * 1024 * 1024)
+            total_bytes = 0
 
             for i, img in enumerate(images, start=1):
                 if fmt == "png":
                     out_path = os.path.join(output_dir, f"page_{i:03d}.png")
-                    img.save(out_path, format="PNG", optimize=False)
+                    img.save(out_path, format="PNG")
                 else:
                     out_path = os.path.join(output_dir, f"page_{i:03d}.jpg")
-                    img = img.convert("RGB")
-                    img.save(out_path, format="JPEG", quality=int(self.valves.jpeg_quality), optimize=True)
+                    img.convert("RGB").save(out_path, format="JPEG", quality=self.valves.jpeg_quality)
 
-                sz = os.path.getsize(out_path)
-                running_bytes += sz
+                size = os.path.getsize(out_path)
+                total_bytes += size
                 paths.append(out_path)
 
-                # Stop when total bytes limit reached (prevents giant payload)
-                if running_bytes > max_total_bytes:
-                    self._log(f"⚠️ Image payload limit reached at page {i} (>{self.valves.max_total_image_mb}MB). Stopping.")
+                if total_bytes > max_bytes:
+                    self._log(f"Size limit reached at page {i}")
                     break
 
-            self._log(f"✅ Rendered {len(paths)} pages to images (total ~{running_bytes/1024/1024:.2f}MB)")
-            return paths
+            self._log(f"Rendered {len(paths)} pages ({total_bytes/1024/1024:.1f}MB)")
+
         except Exception as e:
-            self._log(f"❌ PDF->images error: {type(e).__name__}: {e}")
-            return paths
+            self._log(f"PDF rendering error: {e}")
 
-    def image_file_to_data_url(self, img_path: str) -> Optional[str]:
-        try:
-            with open(img_path, "rb") as f:
-                raw = f.read()
-            ext = os.path.splitext(img_path)[1].lower()
-            if ext == ".png":
-                mime = "image/png"
-            elif ext in (".jpg", ".jpeg"):
-                mime = "image/jpeg"
-            else:
-                mime = "image/png"
-            b64 = base64.b64encode(raw).decode("utf-8")
-            return f"data:{mime};base64,{b64}"
-        except Exception:
-            return None
+        return paths
 
-    # -------------------------
-    # EMF/WMF extraction from PPTX
-    # -------------------------
-    def extract_emf_wmf_images(self, ppt_path: str, output_dir: str) -> List[str]:
-        """
-        Extract EMF/WMF images from PPTX and convert to PNG.
-        EMF/WMF are vector formats commonly used for chemical structures in PowerPoint.
-        """
-        extracted_paths: List[str] = []
-        
-        try:
-            with zipfile.ZipFile(ppt_path, 'r') as pptx_zip:
-                # Find all EMF/WMF files in the media folder
-                media_files = [f for f in pptx_zip.namelist() 
-                              if f.startswith('ppt/media/') and 
-                              f.lower().endswith(('.emf', '.wmf'))]
-                
-                if not media_files:
-                    self._log("No EMF/WMF images found in PPTX")
-                    return extracted_paths
-                
-                self._log(f"Found {len(media_files)} EMF/WMF images in PPTX")
-                
-                for i, media_file in enumerate(media_files):
-                    try:
-                        # Extract the EMF/WMF file
-                        ext = os.path.splitext(media_file)[1].lower()
-                        temp_emf = os.path.join(output_dir, f"emf_{i}{ext}")
-                        
-                        with pptx_zip.open(media_file) as src:
-                            with open(temp_emf, 'wb') as dst:
-                                dst.write(src.read())
-                        
-                        # Convert EMF/WMF to PNG using ImageMagick or LibreOffice
-                        output_png = os.path.join(output_dir, f"emf_{i}.png")
-                        
-                        # Try ImageMagick first (faster)
-                        convert_cmd = shutil.which("convert") or shutil.which("magick")
-                        if convert_cmd:
-                            result = subprocess.run(
-                                [convert_cmd, "-density", str(self.valves.dpi), 
-                                 temp_emf, "-background", "white", "-flatten", output_png],
-                                capture_output=True,
-                                timeout=30
-                            )
-                            if result.returncode == 0 and os.path.exists(output_png):
-                                extracted_paths.append(output_png)
-                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via ImageMagick")
-                                continue
-                        
-                        # Fallback: try LibreOffice
-                        lo = self._find_libreoffice()
-                        if lo:
-                            # LibreOffice can convert EMF to PDF, then we convert PDF to PNG
-                            result = subprocess.run(
-                                [lo, "--headless", "--convert-to", "png", 
-                                 "--outdir", output_dir, temp_emf],
-                                capture_output=True,
-                                timeout=30
-                            )
-                            expected_png = os.path.join(output_dir, f"emf_{i}.png")
-                            if os.path.exists(expected_png):
-                                extracted_paths.append(expected_png)
-                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via LibreOffice")
-                                continue
-                        
-                        # Fallback: try inkscape for WMF
-                        inkscape = shutil.which("inkscape")
-                        if inkscape and ext == '.wmf':
-                            result = subprocess.run(
-                                [inkscape, temp_emf, "--export-type=png", 
-                                 f"--export-filename={output_png}",
-                                 f"--export-dpi={self.valves.dpi}"],
-                                capture_output=True,
-                                timeout=30
-                            )
-                            if os.path.exists(output_png):
-                                extracted_paths.append(output_png)
-                                self._log(f"✅ Converted {os.path.basename(media_file)} to PNG via Inkscape")
-                                continue
-                        
-                        self._log(f"⚠️ Could not convert {os.path.basename(media_file)} - no converter available")
-                        
-                    except Exception as e:
-                        self._log(f"⚠️ Error extracting {media_file}: {e}")
-                
-                # Also extract regular images (PNG, JPG) that might be structures
-                regular_images = [f for f in pptx_zip.namelist() 
-                                 if f.startswith('ppt/media/') and 
-                                 f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-                
-                for i, img_file in enumerate(regular_images):
-                    try:
-                        ext = os.path.splitext(img_file)[1].lower()
-                        output_path = os.path.join(output_dir, f"img_{i}{ext}")
-                        
-                        with pptx_zip.open(img_file) as src:
-                            with open(output_path, 'wb') as dst:
-                                dst.write(src.read())
-                        
-                        # Only include if it's a reasonable size (likely a structure, not a tiny icon)
-                        if os.path.getsize(output_path) > 5000:  # > 5KB
-                            extracted_paths.append(output_path)
-                            self._log(f"✅ Extracted {os.path.basename(img_file)}")
-                    except Exception as e:
-                        self._log(f"⚠️ Error extracting {img_file}: {e}")
-                        
-        except Exception as e:
-            self._log(f"❌ EMF/WMF extraction error: {e}")
-        
-        return extracted_paths
+    # =========================================================================
+    # PPTX CONTENT EXTRACTION
+    # =========================================================================
 
-    # -------------------------
-    # PPTX text/table extraction
-    # -------------------------
-    def extract_pptx_text_tables(self, ppt_path: str) -> Dict[str, Any]:
-        """
-        Extract text + tables for copyable context. (Does not render visuals.)
-        Rendering is done via PDF pipeline.
-        """
-        out: Dict[str, Any] = {"slides": [], "total_slides": 0}
-        if not (self.valves.include_pptx_text and PPTX_AVAILABLE):
-            return out
+    def _extract_pptx_text(self, ppt_path: str) -> str:
+        """Extract text and tables from PPTX."""
+        if not PPTX_AVAILABLE or not self.valves.extract_text:
+            return ""
 
         try:
             prs = Presentation(ppt_path)
-            slides = []
+            parts = []
+
             for idx, slide in enumerate(prs.slides, start=1):
-                texts: List[str] = []
-                tables: List[List[List[str]]] = []
-
+                slide_text = []
+                
                 for shape in slide.shapes:
-                    # text
                     if hasattr(shape, "text") and shape.text:
-                        t = str(shape.text).strip()
-                        if t:
-                            texts.append(t)
+                        text = shape.text.strip()
+                        if text:
+                            slide_text.append(text)
 
-                    # tables
                     if getattr(shape, "has_table", False):
                         try:
-                            table = shape.table
                             rows = []
-                            for row in table.rows:
-                                row_vals = []
-                                for cell in row.cells:
-                                    row_vals.append((cell.text or "").strip())
-                                rows.append(row_vals)
+                            for row in shape.table.rows:
+                                cells = [cell.text.strip() for cell in row.cells]
+                                rows.append(" | ".join(cells))
                             if rows:
-                                tables.append(rows)
-                        except Exception:
+                                slide_text.append("[Table]\n" + "\n".join(rows))
+                        except:
                             pass
 
-                notes = ""
-                try:
-                    if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-                        notes = (slide.notes_slide.notes_text_frame.text or "").strip()
-                except Exception:
-                    pass
+                if slide_text:
+                    parts.append(f"--- Slide {idx} ---\n" + "\n".join(slide_text))
 
-                slides.append({
-                    "slide_number": idx,
-                    "text": "\n".join(texts).strip(),
-                    "tables": tables,
-                    "notes": notes
-                })
+            return "\n\n".join(parts)
 
-            out["slides"] = slides
-            out["total_slides"] = len(slides)
-            return out
         except Exception as e:
-            self._log(f"⚠️ PPTX text extraction failed: {type(e).__name__}: {e}")
-            return out
+            self._log(f"Text extraction error: {e}")
+            return ""
 
-    def format_pptx_text_tables(self, extracted: Dict[str, Any], file_name: str) -> str:
-        slides = extracted.get("slides") or []
-        if not slides:
-            return f"=== PPTX: {file_name} ===\n(No text/tables extracted.)"
+    def _extract_pptx_images(self, ppt_path: str, output_dir: str) -> List[str]:
+        """Extract embedded images (PNG, JPG) from PPTX."""
+        if not self.valves.extract_embedded_images:
+            return []
 
-        parts = [f"=== PPTX: {file_name} (Text/Tables/Notes) ==="]
-        for s in slides:
-            sn = s.get("slide_number")
-            text = (s.get("text") or "").strip()
-            notes = (s.get("notes") or "").strip()
-            tables = s.get("tables") or []
+        paths = []
+        try:
+            with zipfile.ZipFile(ppt_path, 'r') as z:
+                media_files = [f for f in z.namelist() 
+                              if f.startswith('ppt/media/') and 
+                              f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
 
-            parts.append(f"\n--- Slide {sn} ---")
-            if text:
-                parts.append(text)
-            if notes:
-                parts.append("\n[Notes]\n" + notes)
+                for i, media_file in enumerate(media_files):
+                    try:
+                        ext = os.path.splitext(media_file)[1].lower()
+                        out_path = os.path.join(output_dir, f"image_{i}{ext}")
+                        
+                        data = z.read(media_file)
+                        
+                        # Skip tiny images (likely icons)
+                        if len(data) < 5000:
+                            continue
+                            
+                        with open(out_path, 'wb') as f:
+                            f.write(data)
+                        
+                        paths.append(out_path)
+                        self._log(f"Extracted {os.path.basename(media_file)}")
+                        
+                    except Exception as e:
+                        self._log(f"Error extracting {media_file}: {e}")
 
-            # tables pretty-print
-            for ti, trows in enumerate(tables, start=1):
-                parts.append(f"\n[Table {ti}]")
-                for row in trows:
-                    parts.append(" | ".join(row))
+        except Exception as e:
+            self._log(f"Image extraction error: {e}")
 
-        return "\n".join(parts).strip()
+        return paths
 
-    # -------------------------
-    # Main filter: inject text + images into last user message
-    # -------------------------
+    def _extract_emf_wmf(self, ppt_path: str, output_dir: str) -> List[str]:
+        """Extract and convert EMF/WMF images from PPTX."""
+        if not self.valves.convert_emf_wmf:
+            return []
+
+        paths = []
+        lo = self._find_libreoffice()
+        
+        try:
+            with zipfile.ZipFile(ppt_path, 'r') as z:
+                emf_files = [f for f in z.namelist() 
+                            if f.startswith('ppt/media/') and 
+                            f.lower().endswith(('.emf', '.wmf'))]
+
+                if not emf_files:
+                    return []
+
+                self._log(f"Found {len(emf_files)} EMF/WMF files")
+
+                for i, emf_file in enumerate(emf_files):
+                    try:
+                        ext = os.path.splitext(emf_file)[1].lower()
+                        temp_emf = os.path.join(output_dir, f"temp_{i}{ext}")
+                        output_png = os.path.join(output_dir, f"emf_{i}.png")
+
+                        # Extract EMF file
+                        with z.open(emf_file) as src:
+                            with open(temp_emf, 'wb') as dst:
+                                dst.write(src.read())
+
+                        # Try ImageMagick first
+                        convert_cmd = shutil.which("convert") or shutil.which("magick")
+                        if convert_cmd:
+                            result = subprocess.run(
+                                [convert_cmd, "-density", "300", temp_emf, 
+                                 "-background", "white", "-flatten", output_png],
+                                capture_output=True, timeout=30
+                            )
+                            if result.returncode == 0 and os.path.exists(output_png):
+                                paths.append(output_png)
+                                self._log(f"Converted {os.path.basename(emf_file)} via ImageMagick")
+                                continue
+
+                        # Try LibreOffice: EMF -> PDF -> PNG
+                        if lo:
+                            pdf_dir = os.path.join(output_dir, f"emf_pdf_{i}")
+                            os.makedirs(pdf_dir, exist_ok=True)
+                            profile = tempfile.mkdtemp(prefix="lo_emf_")
+                            
+                            try:
+                                env = os.environ.copy()
+                                env["HOME"] = "/tmp"
+                                
+                                subprocess.run(
+                                    [lo, "--headless", "--nologo",
+                                     f"-env:UserInstallation=file://{profile}",
+                                     "--convert-to", "pdf", "--outdir", pdf_dir, temp_emf],
+                                    capture_output=True, timeout=30, env=env
+                                )
+
+                                # Find PDF and convert to PNG
+                                for fn in os.listdir(pdf_dir):
+                                    if fn.endswith(".pdf"):
+                                        pdf_path = os.path.join(pdf_dir, fn)
+                                        try:
+                                            from pdf2image import convert_from_path
+                                            imgs = convert_from_path(pdf_path, dpi=300, first_page=1, last_page=1)
+                                            if imgs:
+                                                imgs[0].save(output_png, format="PNG")
+                                                if os.path.exists(output_png):
+                                                    paths.append(output_png)
+                                                    self._log(f"Converted {os.path.basename(emf_file)} via LibreOffice")
+                                        except:
+                                            pass
+                                        break
+                            finally:
+                                shutil.rmtree(profile, ignore_errors=True)
+                                shutil.rmtree(pdf_dir, ignore_errors=True)
+
+                    except Exception as e:
+                        self._log(f"EMF conversion error: {e}")
+
+        except Exception as e:
+            self._log(f"EMF extraction error: {e}")
+
+        return paths
+
+    # =========================================================================
+    # IMAGE UTILITIES
+    # =========================================================================
+
+    def _to_data_url(self, img_path: str) -> Optional[str]:
+        """Convert image file to base64 data URL."""
+        try:
+            with open(img_path, "rb") as f:
+                data = f.read()
+            
+            ext = os.path.splitext(img_path)[1].lower()
+            mime = {
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+            }.get(ext, "image/png")
+            
+            b64 = base64.b64encode(data).decode("utf-8")
+            return f"data:{mime};base64,{b64}"
+        except:
+            return None
+
+    # =========================================================================
+    # MAIN FILTER
+    # =========================================================================
+
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
-        self._log("=" * 60)
-        self._log("INLET - PPT/PDF Vision Filter v10.1 (PPT->PDF->PNG + EMF/WMF)")
+        """Process PPT/PDF files in the current message."""
+        
         if not self.valves.enabled:
             return body
 
@@ -483,114 +478,120 @@ class Filter:
         if not messages:
             return body
 
-        files = self._extract_all_files(body, messages)
-        if not files:
-            self._log("No files found in request.")
+        # Get files from CURRENT message only
+        files = self._get_current_message_files(body, messages)
+        
+        # Filter to supported file types
+        supported_files = []
+        for f in files:
+            name = self._get_file_name(f)
+            path = self._get_file_path(f)
+            
+            if not path or not os.path.exists(path):
+                continue
+                
+            if not self._is_supported_file(name):
+                self._log(f"Skipping unsupported file: {name}")
+                continue
+            
+            # Check if already processed (by file hash)
+            file_hash = self._file_hash(path)
+            if file_hash in self._processed_files:
+                self._log(f"Skipping already processed: {name}")
+                continue
+            
+            supported_files.append((f, name, path, file_hash))
+
+        if not supported_files:
+            self._log("No new PPT/PDF files to process")
             return body
 
-        all_text_sections: List[str] = []
-        all_images: List[Dict[str, Any]] = []
+        self._log("=" * 60)
+        self._log(f"Processing {len(supported_files)} file(s)")
 
-        for fobj in files:
-            file_path = self._get_file_path(fobj)
-            file_name = self._get_file_name(fobj)
+        all_text = []
+        all_images = []
 
-            if not file_path or not os.path.exists(file_path):
-                continue
-            if not file_name:
-                file_name = os.path.basename(file_path).lower()
-
-            is_pptx = file_name.endswith((".ppt", ".pptx"))
-            is_pdf = file_name.endswith(".pdf")
-            if not (is_pptx or is_pdf):
-                continue
-
+        for file_obj, file_name, file_path, file_hash in supported_files:
             self._log(f"Processing: {file_name}")
-
+            
             with tempfile.TemporaryDirectory() as tmp:
-                pdf_path = None
+                is_pptx = file_name.endswith((".ppt", ".pptx"))
+                is_pdf = file_name.endswith(".pdf")
 
-                # PPTX -> PDF (with fast failure)
-                if is_pptx and self.valves.render_pptx_via_pdf:
-                    pdf_path = self.convert_pptx_to_pdf(file_path, tmp)
-                    if pdf_path:
-                        self._log(f"✅ PPTX converted to PDF: {os.path.basename(pdf_path)}")
-                    else:
-                        self._log("⚠️ PPTX->PDF failed or timed out. Using text extraction only (faster).")
-
-                # Always extract text/tables for PPTX (works even if PDF conversion fails)
+                # PPTX processing
                 if is_pptx:
-                    extracted = self.extract_pptx_text_tables(file_path)
-                    if extracted.get("slides"):
-                        all_text_sections.append(self.format_pptx_text_tables(extracted, file_name))
-                        self._log(f"✅ Extracted text from {len(extracted.get('slides', []))} slides")
-                    
-                    # Extract EMF/WMF images (chemical structures) from PPTX
-                    emf_paths = self.extract_emf_wmf_images(file_path, tmp)
-                    for p in emf_paths:
-                        url = self.image_file_to_data_url(p)
-                        if url:
-                            all_images.append({
-                                "type": "image_url",
-                                "image_url": {"url": url}
-                            })
-                    if emf_paths:
-                        self._log(f"✅ Added {len(emf_paths)} EMF/WMF/embedded images from {file_name}")
+                    # Extract text
+                    text = self._extract_pptx_text(file_path)
+                    if text:
+                        all_text.append(f"=== {file_name} ===\n{text}")
+                        self._log(f"Extracted text ({len(text)} chars)")
 
-                # PDF direct
-                if is_pdf:
-                    pdf_path = file_path
-
-                # Render PDF pages -> images
-                if pdf_path and os.path.exists(pdf_path):
-                    img_paths = self.convert_pdf_to_images(pdf_path, tmp)
+                    # Extract embedded images
+                    img_paths = self._extract_pptx_images(file_path, tmp)
                     for p in img_paths:
-                        url = self.image_file_to_data_url(p)
+                        url = self._to_data_url(p)
                         if url:
-                            all_images.append({
-                                "type": "image_url",
-                                "image_url": {"url": url}
-                            })
-                    self._log(f"✅ Added {len(img_paths)} rendered page images for {file_name}")
+                            all_images.append({"type": "image_url", "image_url": {"url": url}})
 
-        if not all_text_sections and not all_images:
-            self._log("No extractable content produced.")
+                    # Extract EMF/WMF
+                    emf_paths = self._extract_emf_wmf(file_path, tmp)
+                    for p in emf_paths:
+                        url = self._to_data_url(p)
+                        if url:
+                            all_images.append({"type": "image_url", "image_url": {"url": url}})
+
+                    # Convert to PDF for page rendering
+                    pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
+                    if pdf_path:
+                        page_paths = self._convert_pdf_to_images(pdf_path, tmp)
+                        for p in page_paths:
+                            url = self._to_data_url(p)
+                            if url:
+                                all_images.append({"type": "image_url", "image_url": {"url": url}})
+
+                # PDF processing
+                elif is_pdf:
+                    page_paths = self._convert_pdf_to_images(file_path, tmp)
+                    for p in page_paths:
+                        url = self._to_data_url(p)
+                        if url:
+                            all_images.append({"type": "image_url", "image_url": {"url": url}})
+
+            # Mark as processed
+            self._processed_files.add(file_hash)
+
+        # Build response
+        if not all_text and not all_images:
+            self._log("No content extracted")
             return body
 
-        # Build combined text prompt in the last user message
-        last_message = messages[-1]
-        original_prompt = self._extract_text_content(last_message.get("content", ""))
-
-        combined_text = original_prompt.strip() + "\n\n"
-
-        if all_text_sections:
-            combined_text += "Document text/tables/notes (extracted):\n"
-            combined_text += "\n\n".join(all_text_sections).strip()
-            combined_text += "\n\n"
-
-        if all_images:
-            combined_text += (
-                f"Attached are {len(all_images)} high-resolution page images for visual analysis "
-                f"(rendered at {self.valves.dpi} DPI, format={self.valves.output_format}).\n\n"
+        last_msg = messages[-1]
+        original = last_msg.get("content", "")
+        if isinstance(original, list):
+            original = " ".join(
+                item.get("text", "") for item in original 
+                if isinstance(item, dict) and item.get("type") == "text"
             )
 
-        # Replace last message content with a text block + image blocks
-        content_blocks: List[Dict[str, Any]] = [{"type": "text", "text": combined_text}]
+        # Build content blocks
+        text_content = original.strip()
+        if all_text:
+            text_content += "\n\n--- Extracted Document Content ---\n" + "\n\n".join(all_text)
+        if all_images:
+            text_content += f"\n\n[{len(all_images)} document images attached for visual analysis]"
 
-        # Ensure images are clean and only contain expected keys
+        content_blocks = [{"type": "text", "text": text_content}]
         for img in all_images:
-            if isinstance(img, dict) and img.get("type") == "image_url":
-                iu = img.get("image_url", {})
-                if isinstance(iu, dict) and iu.get("url"):
-                    content_blocks.append({"type": "image_url", "image_url": {"url": iu["url"]}})
+            if img.get("image_url", {}).get("url"):
+                content_blocks.append(img)
 
         messages[-1]["content"] = content_blocks
         body["messages"] = messages
 
-        self._log(f"✅ Final payload to OpenWebUI:")
-        self._log(f"   - Text sections: {len(all_text_sections)}")
-        self._log(f"   - Image blocks: {len(all_images)} (lossless PNG recommended)")
+        self._log(f"Done: {len(all_text)} text sections, {len(all_images)} images")
         self._log("=" * 60)
+        
         return body
 
     def stream(self, event: dict, __user__: Optional[dict] = None) -> dict:

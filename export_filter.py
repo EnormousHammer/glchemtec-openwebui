@@ -33,7 +33,7 @@ class Filter:
         )
         # Branding and customization
         company_name: str = Field(default="GLChemTec", description="Company name for branding")
-        company_logo_path: str = Field(default="", description="Path to company logo image")
+        company_logo_path: str = Field(default="/app/backend/open_webui/static/branding/GLC_Logo.png", description="Path to company logo image")
         primary_color: str = Field(default="#1d2b3a", description="Primary brand color (hex)")
         secondary_color: str = Field(default="#e6eef5", description="Secondary brand color (hex)")
         enable_sharepoint: bool = Field(default=False, description="Enable SharePoint integration (forced off)")
@@ -116,9 +116,26 @@ class Filter:
     
     def _get_branding_config(self) -> Dict[str, Any]:
         """Get branding configuration from environment or valves."""
+        # Find logo - check multiple possible locations
+        logo_path = self.valves.company_logo_path or os.environ.get("COMPANY_LOGO_PATH", "")
+        
+        # If not set or doesn't exist, try common locations
+        if not logo_path or not os.path.exists(logo_path):
+            possible_paths = [
+                "/app/backend/open_webui/static/branding/GLC_Logo.png",
+                "/app/backend/static/branding/GLC_Logo.png",
+                "/app/public/GLC_Logo.png",
+                "public/GLC_Logo.png",
+            ]
+            for p in possible_paths:
+                if os.path.exists(p):
+                    logo_path = p
+                    self._log(f"Found logo at: {p}")
+                    break
+        
         return {
             "company_name": self.valves.company_name or os.environ.get("COMPANY_NAME", "GLChemTec"),
-            "logo_path": self.valves.company_logo_path or os.environ.get("COMPANY_LOGO_PATH", ""),
+            "logo_path": logo_path if logo_path and os.path.exists(logo_path) else "",
             "primary_color": self.valves.primary_color or os.environ.get("PRIMARY_COLOR", "#1d2b3a"),
             "secondary_color": self.valves.secondary_color or os.environ.get("SECONDARY_COLOR", "#e6eef5"),
         }
