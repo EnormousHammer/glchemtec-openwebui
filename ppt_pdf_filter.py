@@ -672,8 +672,8 @@ class Filter:
                                 page_paths = self._convert_pdf_to_images(pdf_path, tmp)
                                 pdf_pages_rendered = len(page_paths)
                                 
-                                # Limit images to prevent timeout - process max 15 pages
-                                max_pages_to_encode = min(15, pdf_pages_rendered)
+                                # Limit images to prevent timeout - process max 25 pages (handles typical 10-25 slide PPTs)
+                                max_pages_to_encode = min(25, pdf_pages_rendered)
                                 if pdf_pages_rendered > max_pages_to_encode:
                                     self._log(f"Limiting to {max_pages_to_encode} pages (out of {pdf_pages_rendered}) to prevent timeout")
                                     page_paths = page_paths[:max_pages_to_encode]
