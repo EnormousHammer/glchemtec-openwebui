@@ -648,26 +648,8 @@ class Filter:
                         all_text.append(f"=== {file_name} ===\n{text}")
                         self._log(f"Extracted text ({len(text)} chars)")
 
-                    # Extract embedded images (FAST - these are always available)
-                    # Limit to prevent timeout - max 15 embedded images (for 10-25 slide PPTs)
-                    img_paths = self._extract_pptx_images(file_path, tmp)
-                    embedded_count = len(img_paths)
-                    max_embedded = min(15, embedded_count)  # Limit to 15 for speed
-                    if embedded_count > max_embedded:
-                        self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent timeout")
-                        img_paths = img_paths[:max_embedded]
-                    
-                    encoded_embedded = 0
-                    for p in img_paths:
-                        url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
-                        if url:
-                            all_images.append({"type": "image_url", "image_url": {"url": url}})
-                            encoded_embedded += 1
-                    if encoded_embedded > 0:
-                        self._log(f"Extracted {encoded_embedded}/{embedded_count} embedded images")
-
-                    # Convert to PDF for page rendering (PRIORITY - do this first for large PPTs)
-                    # PDF conversion gives us full slide images which are more important than EMF
+                    # PRIORITY: Check time and do PDF conversion FIRST (before embedded images)
+                    # PDF conversion gives us full slide images which are more important than embedded images
                     elapsed = time.time() - start_time
                     time_remaining = self.valves.max_processing_time - elapsed
                     
