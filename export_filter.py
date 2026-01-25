@@ -317,20 +317,20 @@ class Filter:
                     
                     # Proxy runs on localhost:8000 but Render only exposes port 8080
                     # So we MUST use public_base_url (OpenWebUI's public URL) for browser access
-                    # The proxy endpoints need to be routed through OpenWebUI or accessible via same domain
-                    if self.valves.public_base_url:
-                        # Use public URL - proxy should be accessible via same domain
-                        # If proxy is on same server, it might be routed through OpenWebUI
-                        download_url = f"{self.valves.public_base_url}/v1/export/download/{file_id}"
+                    # The proxy endpoints are routed through OpenWebUI via backend_startup_hook.py
+                    public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+                    
+                    if public_url:
+                        # Use public URL - proxy routes are accessible via OpenWebUI's domain
+                        # backend_startup_hook.py routes /v1/export/* to localhost:8000
+                        download_url = f"{public_url}/v1/export/download/{file_id}"
                         self._log(f"Using public URL for download: {download_url}")
-                    elif "localhost" not in self.valves.export_service_url and "127.0.0.1" not in self.valves.export_service_url:
-                        # export_service_url is already publicly accessible (unlikely but possible)
-                        download_url = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
-                        self._log(f"Using export_service_url for download: {download_url}")
                     else:
-                        # No public URL available - this won't work from browser
-                        download_url = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
-                        self._log(f"ERROR: No public URL configured - download will fail from browser: {download_url}")
+                        # Fallback: try to construct from request (last resort)
+                        # This won't work but at least we tried
+                        download_url = f"http://localhost:8000/v1/export/download/{file_id}"
+                        self._log(f"WARNING: No public URL found - download may fail: {download_url}")
+                        self._log(f"Please set WEBUI_URL or PUBLIC_URL environment variable")
                     
                     self._log(f"Export created: {result.get('filename')} (ID: {file_id}, URL: {download_url})")
                     
