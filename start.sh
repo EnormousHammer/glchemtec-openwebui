@@ -63,9 +63,8 @@ python3 /app/fix_database_wal.py >/tmp/db_wal_fix.log 2>&1 || true
 python3 /app/set_default_connection.py >/tmp/connection_default.log 2>&1 || true
 python3 /app/set_connection_on_startup.py >/tmp/connection_enforce.log 2>&1 &
 
-# Import backend_startup_hook to register export proxy routes
-# This ensures routes are added before OpenWebUI starts
-python3 -c "import sys; sys.path.insert(0, '/app/backend'); import backend_startup_hook; print('[STARTUP] Export proxy routes should be registered')" 2>&1 || true
+# Register export proxy routes after OpenWebUI starts
+python3 /app/register_export_routes.py >/tmp/export_routes.log 2>&1 &
 
 echo "Executing OpenWebUI start script..."
 exec /app/backend/start.sh
