@@ -514,11 +514,25 @@ class Filter:
     # IMAGE UTILITIES
     # =========================================================================
 
-    def _to_data_url(self, img_path: str) -> Optional[str]:
-        """Convert image file to base64 data URL."""
+    def _to_data_url(self, img_path: str, max_size_mb: float = 2.0) -> Optional[str]:
+        """Convert image file to base64 data URL. Faster with size limits."""
         try:
+            if not os.path.exists(img_path):
+                return None
+            
+            # Check file size - skip if too large (reduced to 2MB for speed)
+            size_mb = os.path.getsize(img_path) / (1024 * 1024)
+            if size_mb > max_size_mb:
+                self._log(f"Skipping large image: {size_mb:.1f}MB (limit: {max_size_mb}MB)")
+                return None
+            
             with open(img_path, "rb") as f:
                 data = f.read()
+            
+            # Skip if still too large after reading (safety check)
+            if len(data) > max_size_mb * 1024 * 1024:
+                self._log(f"Skipping image after read: {len(data)/(1024*1024):.1f}MB")
+                return None
             
             ext = os.path.splitext(img_path)[1].lower()
             mime = {
@@ -526,11 +540,13 @@ class Filter:
                 ".jpg": "image/jpeg",
                 ".jpeg": "image/jpeg",
                 ".gif": "image/gif",
+                ".webp": "image/webp",
             }.get(ext, "image/png")
             
             b64 = base64.b64encode(data).decode("utf-8")
             return f"data:{mime};base64,{b64}"
-        except:
+        except Exception as e:
+            self._log(f"Error encoding image: {e}")
             return None
 
     # =========================================================================
