@@ -25,7 +25,11 @@ class Filter:
         debug: bool = Field(default=True, description="Enable debug logging")
         export_service_url: str = Field(
             default="http://localhost:8000",
-            description="URL of the export service (proxy)"
+            description="URL of the export service (proxy) - internal"
+        )
+        public_base_url: str = Field(
+            default="",
+            description="Public URL for download links (e.g., https://glchemtec-openwebui.onrender.com)"
         )
         # Branding and customization
         company_name: str = Field(default="GLChemTec", description="Company name for branding")
@@ -40,10 +44,15 @@ class Filter:
         try:
             # Get export service URL from env if set, otherwise use default
             export_url = os.environ.get("EXPORT_SERVICE_URL", "http://localhost:8000")
-            self.valves = self.Valves(export_service_url=export_url)
+            # Get public URL for download links
+            public_url = os.environ.get("WEBUI_URL", os.environ.get("PUBLIC_URL", ""))
+            if not public_url:
+                # Try to detect from common env vars
+                public_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+            self.valves = self.Valves(export_service_url=export_url, public_base_url=public_url)
             # Force SharePoint export off regardless of env
             self.valves.enable_sharepoint = False
-            self._log("Export filter initialized")
+            self._log(f"Export filter initialized (public_url: {public_url})")
         except Exception as e:
             # If initialization fails, disable the filter to prevent crashes
             print(f"[EXPORT-FILTER] ERROR in __init__: {e}")
@@ -198,25 +207,44 @@ class Filter:
             return None
     
     def _create_export_with_link(self, report: Dict[str, Any], format_type: str) -> Optional[Dict[str, Any]]:
-        """Create export file and get a download link."""
+        """Create export file and return base64 data URL for direct download."""
         try:
-            url = f"{self.valves.export_service_url}/v1/export/create"
-            self._log(f"Creating export with link from: {url}")
+            # Generate the file bytes directly
+            file_bytes = self._generate_export_file(report, format_type)
             
-            response = requests.post(url, json={
-                "report": report,
-                "format": format_type
-            }, timeout=60)
-            
-            if response.status_code == 200:
-                result = response.json()
-                self._log(f"Export created: {result}")
-                return result
-            else:
-                self._log(f"Export creation failed: {response.status_code} - {response.text[:200]}")
+            if not file_bytes:
+                self._log("Failed to generate export file bytes")
                 return None
+            
+            # Create base64 data URL (works directly in browser, no server needed)
+            b64_data = base64.b64encode(file_bytes).decode("utf-8")
+            
+            if format_type == "pdf":
+                mime_type = "application/pdf"
+                ext = "pdf"
+            else:
+                mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ext = "docx"
+            
+            filename = f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+            
+            # Data URL format: data:mime_type;base64,data
+            data_url = f"data:{mime_type};base64,{b64_data}"
+            
+            self._log(f"Export created with data URL: {filename} ({len(file_bytes)} bytes)")
+            
+            return {
+                "success": True,
+                "filename": filename,
+                "size_bytes": len(file_bytes),
+                "download_url": data_url,
+                "is_data_url": True
+            }
+            
         except Exception as e:
             self._log(f"Export creation error: {e}")
+            import traceback
+            self._log(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _upload_to_sharepoint(self, file_path: str, filename: str) -> Optional[str]:
@@ -320,16 +348,14 @@ class Filter:
             
             if export_result and export_result.get("success"):
                 filename = export_result.get("filename", f"export.{export_format}")
-                file_id = export_result.get("file_id", "")
                 download_url = export_result.get("download_url", "")
                 file_size = export_result.get("size_bytes", 0)
                 file_size_kb = file_size // 1024
                 
-                self._log(f"Export file created: {filename} (ID: {file_id}, {file_size_kb}KB)")
+                self._log(f"Export file created: {filename} ({file_size_kb}KB)")
                 
-                # Build the full download URL
-                base_url = self.valves.export_service_url.rstrip("/")
-                full_download_url = f"{base_url}{download_url}"
+                # download_url is now a data URL (base64) - works directly in browser
+                full_download_url = download_url
                 
                 # Modify user message to tell assistant about the download link
                 instruction = (
@@ -357,7 +383,6 @@ class Filter:
                     body["metadata"] = {}
                 body["metadata"]["export_file"] = {
                     "filename": filename,
-                    "file_id": file_id,
                     "download_url": full_download_url,
                     "format": export_format,
                     "size": file_size
@@ -417,11 +442,9 @@ class Filter:
                     export_result = self._create_export_with_link(report, export_format)
                     
                     if export_result and export_result.get("success"):
-                        base_url = self.valves.export_service_url.rstrip("/")
                         export_file_info = {
                             "filename": export_result.get("filename", f"export.{export_format}"),
-                            "file_id": export_result.get("file_id", ""),
-                            "download_url": f"{base_url}{export_result.get('download_url', '')}",
+                            "download_url": export_result.get("download_url", ""),
                             "format": export_format,
                             "size": export_result.get("size_bytes", 0)
                         }
