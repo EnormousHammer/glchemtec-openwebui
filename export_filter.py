@@ -375,12 +375,11 @@ class Filter:
                 full_download_url = download_url
                 
                 # Modify user message to tell assistant about the download link
+                # DO NOT include the full data URL - it will be added by outlet filter
                 instruction = (
                     f"\n\n[SYSTEM NOTE: The user requested to export this conversation to {export_format.upper()}. "
-                    f"The file '{filename}' ({file_size_kb}KB) has been generated. "
-                    f"IMPORTANT: Include this EXACT clickable download link in your response:\n"
-                    f"**[📥 Download {filename}]({full_download_url})**\n"
-                    f"Tell the user to click the link to download their file.]"
+                    f"The file '{filename}' ({file_size_kb}KB) has been generated and will be available for download. "
+                    f"Simply acknowledge that the export is ready. The download link will be added automatically.]"
                 )
                 
                 if isinstance(last_user_msg.get("content"), str):

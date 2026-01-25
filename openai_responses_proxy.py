@@ -939,82 +939,48 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
     return pdfs, images, texts
 
 
-async def call_responses_api(model: str, user_text: str, pdfs: list[dict], images: list[dict] = None, texts: list[str] = None) -> dict:
+async def call_responses_api(model: str, conversation_history: list[dict]) -> dict:
     """
-    Call OpenAI Responses API with PDF files and/or images.
+    Call OpenAI Responses API with full conversation history (preserves memory).
+    conversation_history should be a list of message dicts with role and content.
     """
-    _content_filter(user_text or "")
+    # Filter user text for content safety
+    for msg in conversation_history:
+        if msg.get("role") == "user":
+            for item in msg.get("content", []):
+                if item.get("type") == "input_text":
+                    _content_filter(item.get("text", ""))
+    
     METRICS["responses_api_calls"] += 1
-    content_items = []
-    
-    # Add PDF files first (using data URL format)
-    for pdf in pdfs:
-        content_items.append({
-            "type": "input_file",
-            "filename": pdf["filename"],
-            "file_data": f"data:application/pdf;base64,{pdf['base64']}",
-        })
-        log(f"Adding PDF: {pdf['filename']}")
-    
-    # Add images if any
-    image_count = 0
-    total_image_size = 0
-    if images:
-        for img in images:
-            img_url = img.get("url", "")
-            if img_url:
-                # Calculate approximate size of base64 image
-                if img_url.startswith("data:"):
-                    try:
-                        b64_part = img_url.split(",", 1)[1] if "," in img_url else ""
-                        total_image_size += len(b64_part)
-                    except:
-                        pass
-                content_items.append({
-                    "type": "input_image",
-                    "image_url": img_url,
-                })
-                image_count += 1
-        log(f"Prepared {image_count} images for API (total size: {total_image_size/1024:.1f}KB)")
-
-    # Add extracted text blocks (DOCX/CSV/XLSX)
-    if texts:
-        for t in texts:
-            if t:
-                content_items.append({
-                    "type": "input_text",
-                    "text": t
-                })
-    
-    # Add user text
-    if user_text:
-        content_items.append({
-            "type": "input_text",
-            "text": user_text
-        })
-    else:
-        content_items.append({
-            "type": "input_text",
-            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, and chemical structures."
-        })
     
     payload = {
         "model": model,
-        "input": [{
-            "role": "user",
-            "content": content_items
-        }]
+        "input": conversation_history
     }
     
     # Log what we're sending - VERIFICATION
     payload_size = len(json.dumps(payload))
+    user_msgs = [m for m in conversation_history if m.get("role") == "user"]
+    assistant_msgs = [m for m in conversation_history if m.get("role") == "assistant"]
+    
+    # Count files/images in current message
+    pdf_count = 0
+    image_count = 0
+    if user_msgs:
+        last_user = user_msgs[-1]
+        for item in last_user.get("content", []):
+            if item.get("type") == "input_file":
+                pdf_count += 1
+            elif item.get("type") == "input_image":
+                image_count += 1
+    
     log(f"📤 SENDING TO OPENAI Responses API:")
     log(f"   Model: {model}")
-    log(f"   PDFs: {len(pdfs)}")
-    log(f"   Images: {image_count} (as input_image blocks - OpenAI WILL receive these)")
-    log(f"   Text blocks: {len(texts)} (includes tables, extracted text - OpenAI WILL receive these)")
+    log(f"   Conversation history: {len(conversation_history)} messages ({len(user_msgs)} user, {len(assistant_msgs)} assistant)")
+    log(f"   PDFs in current message: {pdf_count}")
+    log(f"   Images in current message: {image_count}")
     log(f"   Total payload size: {payload_size/1024:.1f}KB")
-    log(f"✅ VERIFIED: All images, tables, and text content will be received by OpenAI")
+    log(f"✅ VERIFIED: Full conversation history preserved for memory")
     
     client = await get_http_client()
     resp = await _post_with_retry(
@@ -1074,59 +1040,28 @@ async def call_responses_api(model: str, user_text: str, pdfs: list[dict], image
         raise HTTPException(status_code=502, detail="Invalid JSON response from OpenAI")
 
 
-async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], images: list[dict] = None, texts: list[str] = None):
+async def stream_responses_api(model: str, conversation_history: list[dict], request: Request = None):
     """
     Stream OpenAI Responses API SSE and convert to chat-completion chunks.
+    Supports cancellation via request parameter.
+    Preserves full conversation history for memory.
     """
-    _content_filter(user_text or "")
+    # Filter user text for content safety
+    for msg in conversation_history:
+        if msg.get("role") == "user":
+            for item in msg.get("content", []):
+                if item.get("type") == "input_text":
+                    _content_filter(item.get("text", ""))
+    
     METRICS["responses_api_calls"] += 1
-    content_items = []
     
-    for pdf in pdfs:
-        content_items.append({
-            "type": "input_file",
-            "filename": pdf["filename"],
-            "file_data": f"data:application/pdf;base64,{pdf['base64']}",
-        })
-        log(f"Adding PDF: {pdf['filename']}")
-    
-    image_count = 0
-    if images:
-        for img in images:
-            img_url = img.get("url", "")
-            if img_url:
-                content_items.append({
-                    "type": "input_image",
-                    "image_url": img_url,
-                })
-                image_count += 1
-        log(f"Streaming: Prepared {image_count} images for API")
-
-    if texts:
-        for t in texts:
-            if t:
-                content_items.append({
-                    "type": "input_text",
-                    "text": t
-                })
-    
-    if user_text:
-        content_items.append({
-            "type": "input_text",
-            "text": user_text
-        })
-    else:
-        content_items.append({
-            "type": "input_text",
-            "text": "Analyze the attached document(s). Extract all visible content including text, tables, charts, diagrams, and chemical structures."
-        })
+    user_msgs = [m for m in conversation_history if m.get("role") == "user"]
+    assistant_msgs = [m for m in conversation_history if m.get("role") == "assistant"]
+    log(f"Streaming with conversation history: {len(conversation_history)} messages ({len(user_msgs)} user, {len(assistant_msgs)} assistant)")
     
     payload = {
         "model": model,
-        "input": [{
-            "role": "user",
-            "content": content_items
-        }],
+        "input": conversation_history,
         "stream": True,
     }
 
@@ -1159,13 +1094,15 @@ async def stream_responses_api(model: str, user_text: str, pdfs: list[dict], ima
                     raise HTTPException(status_code=resp.status_code, detail=error_msg)
                 
                     # Success - log that stream started
-                    if image_count > 0:
-                        log(f"✅ Streaming started: {image_count} images sent, waiting for response chunks...")
-                    else:
-                        log(f"✅ Streaming started: waiting for response chunks...")
+                    log(f"✅ Streaming started: waiting for response chunks...")
 
                     chunk_count = 0
                     async for line in resp.aiter_lines():
+                        # Check for client disconnection
+                        if request and await request.is_disconnected():
+                            log("[PROXY] Client disconnected during Responses API stream - stopping")
+                            break
+                        
                         if not line:
                             continue
                         if line.startswith("data:"):
@@ -1264,6 +1201,7 @@ def responses_to_chat_completion(resp_data: dict, model: str) -> dict:
 async def chat_completions(request: Request):
     """
     Main endpoint - intercepts Chat Completions, upgrades to Responses API if PDFs found.
+    Supports request cancellation when client disconnects.
     """
     start = time.perf_counter()
     METRICS["requests_total"] += 1
@@ -1274,6 +1212,11 @@ async def chat_completions(request: Request):
     stream = body.get("stream", False)
     
     log(f"[PROXY] POST /v1/chat/completions - model: {model}, messages: {len(messages)}, stream: {stream}")
+    
+    # Check if client disconnected before processing
+    if await request.is_disconnected():
+        log("[PROXY] Client disconnected before processing")
+        raise HTTPException(status_code=499, detail="Client disconnected")
     
     # Collect all text and find PDF markers
     all_text = ""
@@ -1330,14 +1273,93 @@ async def chat_completions(request: Request):
     if all_pdfs:
         log("Using Responses API for PDF analysis")
         try:
+            # Build conversation history for Responses API (preserve memory)
+            conversation_history = []
+            for msg in messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+                
+                # Skip system messages (handled by OpenWebUI)
+                if role == "system":
+                    continue
+                
+                # Extract text from content
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            text_parts.append(item.get("text", ""))
+                    text = " ".join(text_parts)
+                else:
+                    text = str(content) if content else ""
+                
+                if text.strip() or role == "assistant":
+                    conversation_history.append({
+                        "role": role,
+                        "content": [{"type": "input_text", "text": text.strip()}]
+                    })
+            
+            # Add current user message with files
+            current_user_content = []
+            for pdf in all_pdfs:
+                current_user_content.append({
+                    "type": "input_file",
+                    "filename": pdf["filename"],
+                    "file_data": f"data:application/pdf;base64,{pdf['base64']}",
+                })
+            for img in all_images:
+                img_url = img.get("url", "")
+                if img_url:
+                    current_user_content.append({
+                        "type": "input_image",
+                        "image_url": img_url,
+                    })
+            for txt in all_text_blocks:
+                if txt:
+                    current_user_content.append({
+                        "type": "input_text",
+                        "text": txt
+                    })
+            if augmented_text:
+                current_user_content.append({
+                    "type": "input_text",
+                    "text": augmented_text
+                })
+            
+            # Update last message in history or add new one
+            if conversation_history and conversation_history[-1]["role"] == "user":
+                conversation_history[-1]["content"] = current_user_content
+            else:
+                conversation_history.append({
+                    "role": "user",
+                    "content": current_user_content
+                })
+            
+            log(f"Preserving conversation history: {len(conversation_history)} messages")
+            
             if stream:
                 async def proxied_stream():
-                    async for event in stream_responses_api(model, augmented_text, all_pdfs, all_images, all_text_blocks):
-                        yield event
+                    try:
+                        async for event in stream_responses_api(model, conversation_history, request):
+                            # Check if client disconnected
+                            if await request.is_disconnected():
+                                log("[PROXY] Client disconnected during Responses API streaming - stopping")
+                                break
+                            yield event
+                    except asyncio.CancelledError:
+                        log("[PROXY] Responses API stream cancelled")
+                        raise
+                    except Exception as e:
+                        if "disconnect" in str(e).lower() or "cancelled" in str(e).lower():
+                            log(f"[PROXY] Responses stream cancelled/disconnected: {e}")
+                        else:
+                            raise
 
                 return StreamingResponse(proxied_stream(), media_type="text/event-stream")
 
-            resp_data = await call_responses_api(model, augmented_text, all_pdfs, all_images, all_text_blocks)
+            resp_data = await call_responses_api(model, conversation_history)
             result = responses_to_chat_completion(resp_data, model)
             return JSONResponse(content=result)
             
@@ -1369,20 +1391,33 @@ async def chat_completions(request: Request):
     body["messages"] = cleaned_messages
     
     if stream:
-        # Stream from Chat Completions
+        # Stream from Chat Completions with cancellation support
         async def stream_response():
-            client = await get_http_client()
-            async with client.stream(
-                "POST",
-                f"{OPENAI_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json=body
-            ) as resp:
-                async for chunk in resp.aiter_bytes():
-                    yield chunk
+            try:
+                client = await get_http_client()
+                async with client.stream(
+                    "POST",
+                    f"{OPENAI_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json=body
+                ) as resp:
+                    async for chunk in resp.aiter_bytes():
+                        # Check if client disconnected
+                        if await request.is_disconnected():
+                            log("[PROXY] Client disconnected during streaming - stopping")
+                            break
+                        yield chunk
+            except asyncio.CancelledError:
+                log("[PROXY] Stream cancelled")
+                raise
+            except Exception as e:
+                if "disconnect" in str(e).lower() or "cancelled" in str(e).lower():
+                    log(f"[PROXY] Stream cancelled/disconnected: {e}")
+                else:
+                    raise
         
         return StreamingResponse(stream_response(), media_type="text/event-stream")
     
