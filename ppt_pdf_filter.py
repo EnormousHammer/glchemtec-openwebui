@@ -44,7 +44,7 @@ class Filter:
         libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
         libreoffice_per_slide_timeout: int = Field(default=3, description="Additional seconds per slide")
         max_timeout: int = Field(default=120, description="Maximum timeout cap (120s) - allows more time for large PPTs")
-        max_processing_time: int = Field(default=90, description="Max total processing time (sec) - reduced to prevent timeouts")
+        max_processing_time: int = Field(default=120, description="Max total processing time (sec) - allows time for 10-25 slide PPTs")
 
         # Features
         extract_text: bool = Field(default=True, description="Extract text/tables from PPTX")
@@ -623,17 +623,17 @@ class Filter:
                         self._log(f"Extracted text ({len(text)} chars)")
 
                     # Extract embedded images (FAST - these are always available)
-                    # Limit to prevent timeout - max 10 embedded images
+                    # Limit to prevent timeout - max 15 embedded images (for 10-25 slide PPTs)
                     img_paths = self._extract_pptx_images(file_path, tmp)
                     embedded_count = len(img_paths)
-                    max_embedded = min(10, embedded_count)  # Limit to 10 for speed
+                    max_embedded = min(15, embedded_count)  # Limit to 15 for speed
                     if embedded_count > max_embedded:
                         self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent timeout")
                         img_paths = img_paths[:max_embedded]
                     
                     encoded_embedded = 0
                     for p in img_paths:
-                        url = self._to_data_url(p, max_size_mb=1.5)  # Reduced size limit
+                        url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
                         if url:
                             all_images.append({"type": "image_url", "image_url": {"url": url}})
                             encoded_embedded += 1
@@ -681,14 +681,14 @@ class Filter:
                                 # Encode images with timeout check
                                 encoded_count = 0
                                 for i, p in enumerate(page_paths):
-                                    # Check time remaining every 3 images
-                                    if i > 0 and i % 3 == 0:
+                                    # Check time remaining every 5 images (less frequent checks for speed)
+                                    if i > 0 and i % 5 == 0:
                                         elapsed = time.time() - start_time
-                                        if elapsed > self.valves.max_processing_time - 10:  # Stop 10s before timeout
+                                        if elapsed > self.valves.max_processing_time - 15:  # Stop 15s before timeout
                                             self._log(f"Stopping image encoding - {int(self.valves.max_processing_time - elapsed)}s before timeout")
                                             break
                                     
-                                    url = self._to_data_url(p, max_size_mb=1.5)  # Reduced size limit for speed
+                                    url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
                                     if url:
                                         all_images.append({"type": "image_url", "image_url": {"url": url}})
                                         encoded_count += 1
