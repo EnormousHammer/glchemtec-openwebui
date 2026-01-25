@@ -1978,6 +1978,16 @@ async def create_export_file(request: Request):
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported format: {format_type}")
         
+        # Validate file was actually created
+        if not file_bytes or len(file_bytes) == 0:
+            log(f"ERROR: Export file generation returned empty bytes!")
+            raise HTTPException(status_code=500, detail="Export file generation failed - empty file")
+        
+        # Minimum size check (PDF should be at least a few KB, DOCX should be at least 5KB)
+        min_size = 3000 if format_type == "pdf" else 5000
+        if len(file_bytes) < min_size:
+            log(f"WARNING: Export file seems too small: {len(file_bytes)} bytes (expected at least {min_size})")
+        
         # Generate unique file ID
         file_id = str(uuid.uuid4())[:8]
         filename = _safe_slug(report.get("title", "export")) + f".{ext}"
@@ -1996,7 +2006,7 @@ async def create_export_file(request: Request):
             if EXPORT_FILES[fid].get("created", 0) < cutoff:
                 del EXPORT_FILES[fid]
         
-        log(f"Export file created: {filename} (ID: {file_id}, {len(file_bytes)} bytes)")
+        log(f"Export file created: {filename} (ID: {file_id}, {len(file_bytes):,} bytes, {len(file_bytes)/1024:.1f} KB)")
         
         return JSONResponse({
             "success": True,
