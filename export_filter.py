@@ -285,42 +285,70 @@ class Filter:
                 return None
         
         def _create_export_with_link(self, report: Dict[str, Any], format_type: str) -> Optional[Dict[str, Any]]:
-            """Create export file and return base64 data URL for direct download."""
+            """Create export file via proxy endpoint and return download link."""
             try:
-                # Generate the file bytes directly
-                file_bytes = self._generate_export_file(report, format_type)
+                # Use the proxy's export/create endpoint which handles file storage and returns a download URL
+                url = f"{self.valves.export_service_url}/v1/export/create"
+                self._log(f"Requesting export creation from: {url}")
                 
-                if not file_bytes:
-                    self._log("Failed to generate export file bytes")
-                    return None
-                
-                # Create base64 data URL (works directly in browser, no server needed)
-                b64_data = base64.b64encode(file_bytes).decode("utf-8")
-                
-                if format_type == "pdf":
-                    mime_type = "application/pdf"
-                    ext = "pdf"
-                else:
-                    mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ext = "docx"
-                
-                filename = f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
-                
-                # Data URL format: data:mime_type;base64,data
-                data_url = f"data:{mime_type};base64,{b64_data}"
-                
-                self._log(f"Export created with data URL: {filename} ({len(file_bytes)} bytes)")
-                
-                return {
-                    "success": True,
-                    "filename": filename,
-                    "size_bytes": len(file_bytes),
-                    "download_url": data_url,
-                    "is_data_url": True
+                payload = {
+                    "report": report,
+                    "format": format_type
                 }
                 
+                headers = {"Content-Type": "application/json"}
+                response = requests.post(url, json=payload, headers=headers, timeout=60)
+                
+                self._log(f"Export creation response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("success"):
+                        # Get the download URL - must be publicly accessible from browser
+                        file_id = result.get("file_id")
+                        
+                        # Determine the correct download URL
+                        # If export_service_url is localhost, try to use public_base_url if available
+                        if "localhost" in self.valves.export_service_url or "127.0.0.1" in self.valves.export_service_url:
+                            if self.valves.public_base_url:
+                                # Assume proxy is accessible via public URL (might need routing configured)
+                                # Try using public_base_url - proxy might be on same server
+                                download_url = f"{self.valves.public_base_url}/v1/export/download/{file_id}"
+                                self._log(f"Using public URL for download (proxy routing may be needed): {download_url}")
+                            else:
+                                # Fallback - won't work from browser but log warning
+                                download_url = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
+                                self._log(f"WARNING: Using localhost URL - may not work from browser: {download_url}")
+                        else:
+                            # export_service_url is already publicly accessible
+                            download_url = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
+                        
+                        self._log(f"Export created: {result.get('filename')} (ID: {file_id}, URL: {download_url})")
+                        
+                        return {
+                            "success": True,
+                            "filename": result.get("filename", f"export.{format_type}"),
+                            "size_bytes": result.get("size_bytes", 0),
+                            "download_url": download_url,
+                            "is_data_url": False
+                        }
+                    else:
+                        self._log(f"Export creation failed: {result}")
+                        return None
+                else:
+                    error_text = response.text[:500] if hasattr(response, 'text') else "No error details"
+                    self._log(f"Export creation failed: HTTP {response.status_code}")
+                    self._log(f"Error response: {error_text}")
+                    return None
+                
+            except requests.exceptions.ConnectionError as e:
+                self._log(f"Connection error - proxy not reachable at {self.valves.export_service_url}: {e}")
+                return None
+            except requests.exceptions.Timeout as e:
+                self._log(f"Request timeout after 60s: {e}")
+                return None
             except Exception as e:
-                self._log(f"Export creation error: {e}")
+                self._log(f"Export creation error: {type(e).__name__}: {e}")
                 import traceback
                 self._log(f"Traceback: {traceback.format_exc()}")
                 return None

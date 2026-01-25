@@ -43,8 +43,8 @@ class Filter:
         # Timeouts (balanced for speed and completeness)
         libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
         libreoffice_per_slide_timeout: int = Field(default=3, description="Additional seconds per slide")
-        max_timeout: int = Field(default=60, description="Maximum timeout cap (60s) - will try PDF conversion")
-        max_processing_time: int = Field(default=45, description="Max total processing time (sec) - return what we have even if PDF not done")
+        max_timeout: int = Field(default=120, description="Maximum timeout cap (120s) - allows more time for large PPTs")
+        max_processing_time: int = Field(default=180, description="Max total processing time (sec) - increased for large PPTs with many slides")
 
         # Features
         extract_text: bool = Field(default=True, description="Extract text/tables from PPTX")
@@ -434,12 +434,14 @@ class Filter:
                                 dst.write(src.read())
 
                         # Try ImageMagick first (faster)
+                        # Use lower DPI for EMF (chemical structures are line drawings, don't need 600 DPI)
+                        emf_dpi = 150  # Much faster for line drawings
                         convert_cmd = shutil.which("convert") or shutil.which("magick")
                         if convert_cmd:
                             result = subprocess.run(
-                                [convert_cmd, "-density", str(self.valves.dpi), temp_emf, 
+                                [convert_cmd, "-density", str(emf_dpi), temp_emf, 
                                  "-background", "white", "-flatten", output_png],
-                                capture_output=True, timeout=15
+                                capture_output=True, timeout=5  # Reduced to 5s - fail fast
                             )
                             if result.returncode == 0 and os.path.exists(output_png):
                                 paths.append(output_png)
@@ -460,7 +462,7 @@ class Filter:
                                     [lo, "--headless", "--nologo",
                                      f"-env:UserInstallation=file://{profile}",
                                      "--convert-to", "pdf", "--outdir", pdf_dir, temp_emf],
-                                    capture_output=True, timeout=15, env=env
+                                    capture_output=True, timeout=5, env=env  # Reduced to 5s - fail fast
                                 )
 
                                 # Find PDF and convert to PNG
@@ -469,7 +471,9 @@ class Filter:
                                         pdf_path = os.path.join(pdf_dir, fn)
                                         try:
                                             from pdf2image import convert_from_path
-                                            imgs = convert_from_path(pdf_path, dpi=self.valves.dpi, first_page=1, last_page=1)
+                                            # Use lower DPI for EMF (chemical structures are line drawings, don't need 600 DPI)
+                                            emf_dpi = 150  # Much faster for line drawings
+                                            imgs = convert_from_path(pdf_path, dpi=emf_dpi, first_page=1, last_page=1)
                                             if imgs:
                                                 imgs[0].save(output_png, format="PNG")
                                                 if os.path.exists(output_png):
@@ -526,6 +530,9 @@ class Filter:
         messages = body.get("messages", [])
         if not messages:
             return body
+        
+        self._log("=" * 60)
+        self._log("INLET - PPT/PDF Vision Filter v11.0 (PPT->PDF->PNG + EMF/WMF)")
 
         # Get files from CURRENT message only
         files = self._get_current_message_files(body, messages)
@@ -593,9 +600,62 @@ class Filter:
                     if embedded_count > 0:
                         self._log(f"Extracted {embedded_count} embedded images")
 
-                    # Extract EMF/WMF (moderate speed - try if we have time)
+                    # Convert to PDF for page rendering (PRIORITY - do this first for large PPTs)
+                    # PDF conversion gives us full slide images which are more important than EMF
                     elapsed = time.time() - start_time
-                    if elapsed < 20:  # Only do EMF if we have time
+                    time_remaining = self.valves.max_processing_time - elapsed
+                    
+                    # Calculate time needed: PDF conversion + rendering
+                    # For 22 slides: ~30s base + 22*3 = 96s max, but capped at 120s
+                    pdf_timeout_needed = min(
+                        self.valves.libreoffice_base_timeout + (slide_count * self.valves.libreoffice_per_slide_timeout),
+                        self.valves.max_timeout
+                    )
+                    # More realistic render time estimate: ~2-3s per page for 600 DPI
+                    render_time_needed = max(5, slide_count * 2)  # At least 5s, or 2s per slide
+                    total_pdf_time_needed = pdf_timeout_needed + render_time_needed + 10  # Add 10s buffer for safety
+                    
+                    self._log(f"Time check: {int(time_remaining)}s remaining, need ~{int(total_pdf_time_needed)}s for PDF (conversion: {int(pdf_timeout_needed)}s, render: {int(render_time_needed)}s)")
+                    
+                    pdf_pages_rendered = 0  # Track if PDF conversion succeeded
+                    
+                    # Try PDF conversion if we have at least 80% of needed time (more lenient)
+                    if time_remaining > (total_pdf_time_needed * 0.8):
+                        self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
+                        pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
+                        if pdf_path:
+                            elapsed = time.time() - start_time
+                            time_remaining = self.valves.max_processing_time - elapsed
+                            self._log(f"PDF conversion completed in {elapsed:.1f}s, {int(time_remaining)}s remaining for rendering")
+                            if time_remaining > 5:  # Need at least 5s for rendering
+                                self._log(f"Rendering PDF pages ({int(time_remaining)}s remaining)")
+                                page_paths = self._convert_pdf_to_images(pdf_path, tmp)
+                                pdf_pages_rendered = len(page_paths)
+                                for p in page_paths:
+                                    url = self._to_data_url(p)
+                                    if url:
+                                        all_images.append({"type": "image_url", "image_url": {"url": url}})
+                                elapsed_after_render = time.time() - start_time
+                                self._log(f"Rendered {pdf_pages_rendered} PDF pages (total time: {elapsed_after_render:.1f}s)")
+                            else:
+                                self._log(f"Skipped PDF rendering - only {int(time_remaining)}s remaining (need 5s+)")
+                        else:
+                            elapsed = time.time() - start_time
+                            self._log(f"PDF conversion failed/timed out after {elapsed:.1f}s - continuing with embedded images")
+                    else:
+                        self._log(f"Skipped PDF conversion - not enough time ({int(time_remaining)}s remaining, need ~{int(total_pdf_time_needed)}s)")
+                        self._log(f"Returning with {embedded_count} embedded images and text")
+                    
+                    # Extract EMF/WMF (LOWEST PRIORITY - do AFTER PDF conversion)
+                    # EMF conversion is slow but useful - do it if we have time after PDF
+                    elapsed = time.time() - start_time
+                    time_remaining = self.valves.max_processing_time - elapsed
+                    
+                    # Only do EMF if:
+                    # 1. PDF conversion already succeeded (so we have slide images)
+                    # 2. We have at least 20s remaining (EMF can be slow)
+                    if pdf_pages_rendered > 0 and time_remaining > 20:
+                        self._log(f"Attempting EMF/WMF conversion ({int(time_remaining)}s remaining, {pdf_pages_rendered} PDF pages done)")
                         emf_paths = self._extract_emf_wmf(file_path, tmp)
                         emf_count = len(emf_paths)
                         for p in emf_paths:
@@ -605,34 +665,10 @@ class Filter:
                         if emf_count > 0:
                             self._log(f"Converted {emf_count} EMF/WMF images")
                     else:
-                        self._log("Skipping EMF conversion - prioritizing PDF conversion")
-
-                    # Convert to PDF for page rendering (SLOW but important - try with timeout)
-                    elapsed = time.time() - start_time
-                    time_remaining = self.valves.max_processing_time - elapsed
-                    
-                    if time_remaining > 15:  # Need at least 15s for PDF conversion
-                        self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
-                        pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
-                        if pdf_path:
-                            elapsed = time.time() - start_time
-                            time_remaining = self.valves.max_processing_time - elapsed
-                            if time_remaining > 5:  # Need at least 5s for rendering
-                                self._log(f"Rendering PDF pages ({int(time_remaining)}s remaining)")
-                                page_paths = self._convert_pdf_to_images(pdf_path, tmp)
-                                page_count = len(page_paths)
-                                for p in page_paths:
-                                    url = self._to_data_url(p)
-                                    if url:
-                                        all_images.append({"type": "image_url", "image_url": {"url": url}})
-                                self._log(f"Rendered {page_count} PDF pages")
-                            else:
-                                self._log("Skipped PDF rendering - out of time (but have embedded images)")
+                        if pdf_pages_rendered == 0:
+                            self._log(f"Skipping EMF conversion - PDF conversion should complete first")
                         else:
-                            self._log("PDF conversion failed/timed out - continuing with embedded images")
-                    else:
-                        self._log(f"Skipped PDF conversion - not enough time ({int(time_remaining)}s remaining, need 15s+)")
-                        self._log(f"Returning with {embedded_count} embedded images and text")
+                            self._log(f"Skipping EMF conversion - not enough time ({int(time_remaining)}s remaining, need 20s+)")
                     
                     elapsed = time.time() - start_time
                     self._log(f"Total processing time: {elapsed:.1f}s, {len(all_images)} total images")
