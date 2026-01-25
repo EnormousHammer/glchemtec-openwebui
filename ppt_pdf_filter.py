@@ -44,7 +44,7 @@ class Filter:
         libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
         libreoffice_per_slide_timeout: int = Field(default=3, description="Additional seconds per slide")
         max_timeout: int = Field(default=120, description="Maximum timeout cap (120s) - allows more time for large PPTs")
-        max_processing_time: int = Field(default=180, description="Max total processing time (sec) - increased for large PPTs with many slides")
+        max_processing_time: int = Field(default=90, description="Max total processing time (sec) - reduced to prevent timeouts")
 
         # Features
         extract_text: bool = Field(default=True, description="Extract text/tables from PPTX")
@@ -607,14 +607,22 @@ class Filter:
                         self._log(f"Extracted text ({len(text)} chars)")
 
                     # Extract embedded images (FAST - these are always available)
+                    # Limit to prevent timeout - max 10 embedded images
                     img_paths = self._extract_pptx_images(file_path, tmp)
                     embedded_count = len(img_paths)
+                    max_embedded = min(10, embedded_count)  # Limit to 10 for speed
+                    if embedded_count > max_embedded:
+                        self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent timeout")
+                        img_paths = img_paths[:max_embedded]
+                    
+                    encoded_embedded = 0
                     for p in img_paths:
-                        url = self._to_data_url(p)
+                        url = self._to_data_url(p, max_size_mb=1.5)  # Reduced size limit
                         if url:
                             all_images.append({"type": "image_url", "image_url": {"url": url}})
-                    if embedded_count > 0:
-                        self._log(f"Extracted {embedded_count} embedded images")
+                            encoded_embedded += 1
+                    if encoded_embedded > 0:
+                        self._log(f"Extracted {encoded_embedded}/{embedded_count} embedded images")
 
                     # Convert to PDF for page rendering (PRIORITY - do this first for large PPTs)
                     # PDF conversion gives us full slide images which are more important than EMF
@@ -647,12 +655,30 @@ class Filter:
                                 self._log(f"Rendering PDF pages ({int(time_remaining)}s remaining)")
                                 page_paths = self._convert_pdf_to_images(pdf_path, tmp)
                                 pdf_pages_rendered = len(page_paths)
-                                for p in page_paths:
-                                    url = self._to_data_url(p)
+                                
+                                # Limit images to prevent timeout - process max 15 pages
+                                max_pages_to_encode = min(15, pdf_pages_rendered)
+                                if pdf_pages_rendered > max_pages_to_encode:
+                                    self._log(f"Limiting to {max_pages_to_encode} pages (out of {pdf_pages_rendered}) to prevent timeout")
+                                    page_paths = page_paths[:max_pages_to_encode]
+                                
+                                # Encode images with timeout check
+                                encoded_count = 0
+                                for i, p in enumerate(page_paths):
+                                    # Check time remaining every 3 images
+                                    if i > 0 and i % 3 == 0:
+                                        elapsed = time.time() - start_time
+                                        if elapsed > self.valves.max_processing_time - 10:  # Stop 10s before timeout
+                                            self._log(f"Stopping image encoding - {int(self.valves.max_processing_time - elapsed)}s before timeout")
+                                            break
+                                    
+                                    url = self._to_data_url(p, max_size_mb=1.5)  # Reduced size limit for speed
                                     if url:
                                         all_images.append({"type": "image_url", "image_url": {"url": url}})
+                                        encoded_count += 1
+                                
                                 elapsed_after_render = time.time() - start_time
-                                self._log(f"Rendered {pdf_pages_rendered} PDF pages (total time: {elapsed_after_render:.1f}s)")
+                                self._log(f"Rendered {encoded_count}/{pdf_pages_rendered} PDF pages (total time: {elapsed_after_render:.1f}s)")
                             else:
                                 self._log(f"Skipped PDF rendering - only {int(time_remaining)}s remaining (need 5s+)")
                         else:
