@@ -2062,13 +2062,31 @@ async def download_export_file(file_id: str):
     
     # Force download with proper headers
     # Use 'attachment' to force download instead of opening in browser
+    # RFC 5987 encoding for filenames with special characters
+    from urllib.parse import quote
+    
+    # Create both simple and RFC 5987 encoded filename
+    # Simple filename for basic browsers
+    safe_filename = filename.replace('"', '\\"')
+    # RFC 5987 encoded filename for modern browsers (handles Unicode and special chars)
+    encoded_filename = quote(filename, safe='')
+    
+    # Use both formats for maximum compatibility
+    content_disposition = f'attachment; filename="{safe_filename}"; filename*=UTF-8\'\'{encoded_filename}'
+    
     headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Disposition": content_disposition,
         "Content-Type": mime_type,
         "Content-Length": str(len(file_bytes)),
         # Prevent browser from opening PDF in new tab
-        "X-Content-Type-Options": "nosniff"
+        "X-Content-Type-Options": "nosniff",
+        # Cache control to prevent caching
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
     }
+    
+    log(f"Download headers: Content-Disposition={content_disposition[:100]}...")
     
     return StreamingResponse(
         io.BytesIO(file_bytes),

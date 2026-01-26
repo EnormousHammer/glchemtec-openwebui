@@ -91,10 +91,19 @@ def add_export_proxy_routes(webui_app):
                             response_headers[k] = v
                     
                     # Ensure Content-Disposition is preserved (critical for file downloads)
-                    if "content-disposition" not in {h.lower() for h in response_headers.keys()}:
-                        # If proxy didn't set it, try to get it from response
-                        if "content-disposition" in proxy_response.headers:
-                            response_headers["Content-Disposition"] = proxy_response.headers["content-disposition"]
+                    content_disp = None
+                    for header_name in ["content-disposition", "Content-Disposition"]:
+                        if header_name in proxy_response.headers:
+                            content_disp = proxy_response.headers[header_name]
+                            response_headers["Content-Disposition"] = content_disp
+                            break
+                    
+                    # Log for debugging
+                    if content_disp:
+                        print(f"[EXPORT-ROUTES] ✅ Preserved Content-Disposition: {content_disp[:100]}...")
+                    else:
+                        print(f"[EXPORT-ROUTES] ⚠️ WARNING: Content-Disposition header not found in proxy response!")
+                        print(f"[EXPORT-ROUTES] Available headers: {list(proxy_response.headers.keys())}")
                     
                     # Get content type
                     content_type = proxy_response.headers.get("content-type") or proxy_response.headers.get("Content-Type")
