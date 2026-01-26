@@ -1945,7 +1945,11 @@ async def openai_tts(text: str, voice: str = "alloy", model: str = "tts-1") -> b
 
 
 
-# Temporary file storage for exports (in-memory, cleared periodically)
+# Export file storage - disk-based for multi-worker/instance support
+EXPORT_DIR = Path("/app/backend/data/uploads/exports")
+EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Temporary file storage for exports (in-memory cache, falls back to disk)
 EXPORT_FILES: Dict[str, Dict[str, Any]] = {}
 
 @app.post("/v1/report/pdf")
@@ -2218,7 +2222,26 @@ async def create_export_file(request: Request):
         file_id = str(uuid.uuid4())[:8]
         filename = _safe_slug(report.get("title", "export")) + f".{ext}"
         
-        # Store in memory (will be cleared after download or timeout)
+        # Store on disk (works across workers/instances)
+        safe_name = filename.replace("/", "_").replace("\\", "_")
+        bin_path = EXPORT_DIR / f"{file_id}__{safe_name}"
+        meta_path = EXPORT_DIR / f"{file_id}.json"
+        
+        # Write file bytes to disk
+        bin_path.write_bytes(file_bytes)
+        
+        # Write metadata
+        meta = {
+            "file_id": file_id,
+            "filename": safe_name,
+            "mime_type": mime_type,
+            "size_bytes": len(file_bytes),
+            "created_at": int(time.time()),
+            "bin_path": str(bin_path),
+        }
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+        
+        # Also store in memory cache for fast access (optional)
         EXPORT_FILES[file_id] = {
             "bytes": file_bytes,
             "filename": filename,
@@ -2226,11 +2249,28 @@ async def create_export_file(request: Request):
             "created": time.time()
         }
         
-        # Clean old files (older than 1 hour)
+        # Clean old files from memory (older than 1 hour)
         cutoff = time.time() - 3600
         for fid in list(EXPORT_FILES.keys()):
             if EXPORT_FILES[fid].get("created", 0) < cutoff:
                 del EXPORT_FILES[fid]
+        
+        # Clean old files from disk (older than 24 hours)
+        disk_cutoff = time.time() - (24 * 3600)
+        try:
+            for meta_file in EXPORT_DIR.glob("*.json"):
+                try:
+                    meta_data = json.loads(meta_file.read_text(encoding="utf-8"))
+                    if meta_data.get("created_at", 0) < disk_cutoff:
+                        # Delete both metadata and binary file
+                        meta_file.unlink(missing_ok=True)
+                        bin_file = Path(meta_data.get("bin_path", ""))
+                        if bin_file.exists():
+                            bin_file.unlink(missing_ok=True)
+                except Exception:
+                    pass  # Skip corrupted metadata files
+        except Exception:
+            pass  # Skip if cleanup fails
         
         log(f"Export file created: {filename} (ID: {file_id}, {len(file_bytes):,} bytes, {len(file_bytes)/1024:.1f} KB)")
         
@@ -2250,13 +2290,26 @@ async def create_export_file(request: Request):
 @app.get("/v1/export/download/{file_id}")
 async def download_export_file(file_id: str):
     """Download a previously created export file."""
-    if file_id not in EXPORT_FILES:
-        raise HTTPException(status_code=404, detail="File not found or expired")
-    
-    file_data = EXPORT_FILES[file_id]
-    filename = file_data["filename"]
-    mime_type = file_data["mime_type"]
-    file_bytes = file_data["bytes"]
+    # 1) Try memory cache first (if present)
+    if file_id in EXPORT_FILES:
+        file_data = EXPORT_FILES[file_id]
+        filename = file_data["filename"]
+        mime_type = file_data["mime_type"]
+        file_bytes = file_data["bytes"]
+    else:
+        # 2) Fall back to disk (works across workers/instances)
+        meta_path = EXPORT_DIR / f"{file_id}.json"
+        if not meta_path.exists():
+            raise HTTPException(status_code=404, detail="File not found or expired")
+
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        bin_path = Path(meta["bin_path"])
+        if not bin_path.exists():
+            raise HTTPException(status_code=404, detail="File not found or expired")
+
+        filename = meta["filename"]
+        mime_type = meta["mime_type"]
+        file_bytes = bin_path.read_bytes()
     
     log(f"Export file downloaded: {filename} (ID: {file_id}, {len(file_bytes):,} bytes)")
     

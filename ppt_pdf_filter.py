@@ -31,19 +31,19 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
 
-        # Rendering quality (reduced DPI for memory efficiency - 300 DPI still excellent for spectra)
-        dpi: int = Field(default=300, description="DPI for PDF rendering (300 = good quality, memory efficient)")
-        max_pages: int = Field(default=20, description="Max pages/slides to render (reduced for memory)")
+        # Rendering quality (optimized for chemistry PPTs with EMF/WMF graphics)
+        dpi: int = Field(default=150, description="DPI for PDF rendering (150 = good quality, faster for chemistry PPTs)")
+        max_pages: int = Field(default=10, description="Max pages/slides to render (optimized for chemistry PPTs)")
         output_format: str = Field(default="jpeg", description="png or jpeg (jpeg uses less memory)")
-        jpeg_quality: int = Field(default=85, description="JPEG quality if using jpeg")
+        jpeg_quality: int = Field(default=80, description="JPEG quality if using jpeg (80-85 recommended)")
 
-        # Size limits (reduced for memory efficiency)
-        max_total_image_mb: float = Field(default=30.0, description="Max total image payload (MB)")
+        # Size limits (optimized for chemistry PPTs)
+        max_total_image_mb: float = Field(default=25.0, description="Max total image payload (MB)")
         
-        # Timeouts (optimized for speed - LibreOffice is usually faster than these limits)
-        libreoffice_base_timeout: int = Field(default=15, description="Base LibreOffice timeout (sec) - reduced for speed")
-        libreoffice_per_slide_timeout: int = Field(default=1, description="Additional seconds per slide (1s is usually enough)")
-        max_timeout: int = Field(default=60, description="Maximum timeout cap (60s) - should be enough for most PPTs")
+        # Timeouts (optimized for chemistry PPTs with EMF/WMF graphics and heavy tables)
+        libreoffice_base_timeout: int = Field(default=120, description="Base LibreOffice timeout (sec) - increased for chemistry PPTs")
+        libreoffice_per_slide_timeout: int = Field(default=8, description="Additional seconds per slide (8s recommended for EMF-heavy slides)")
+        max_timeout: int = Field(default=600, description="Maximum timeout cap (600s) - needed for large chemistry PPTs")
         max_processing_time: int = Field(default=120, description="Max total processing time (sec) - allows time for 10-25 slide PPTs")
 
         # Features
