@@ -2149,15 +2149,20 @@ async def create_export_file(request: Request):
         data = await request.json()
         report = data.get("report", {})
         format_type = data.get("format", "pdf").lower()
-        use_ai = data.get("use_ai", True)  # Default to AI generation
+        use_ai = data.get("use_ai", False)  # Default to False for backward compatibility
         conversation = data.get("conversation", [])
         model = data.get("model", "gpt-4o")
         
         # If use_ai is True and we have conversation history, generate AI report first
-        if use_ai and conversation:
+        # Only use AI if explicitly requested AND conversation is provided
+        if use_ai and conversation and len(conversation) > 0:
             try:
                 log(f"Generating AI report for {format_type} export...")
                 ai_report = await _generate_ai_report_internal(conversation, format_type, model)
+                
+                # Validate AI report has required structure
+                if not isinstance(ai_report, dict) or "sections" not in ai_report:
+                    raise ValueError("AI report missing required structure")
                 
                 # Merge AI report with branding/metadata from original report
                 # Preserve branding info
@@ -2180,7 +2185,13 @@ async def create_export_file(request: Request):
                 log(f"✅ Using AI-generated report with {len(report.get('sections', []))} sections")
             except Exception as e:
                 log(f"⚠️ AI report generation failed, falling back to raw report: {e}")
-                # Continue with raw report if AI fails
+                import traceback
+                log(f"Traceback: {traceback.format_exc()}")
+                # Continue with raw report if AI fails - ensure report has minimum structure
+                if not report or not isinstance(report, dict):
+                    raise HTTPException(status_code=500, detail="Export failed: no valid report structure")
+                if "sections" not in report:
+                    report["sections"] = []
         
         if format_type == "pdf":
             file_bytes = render_report_pdf(report)

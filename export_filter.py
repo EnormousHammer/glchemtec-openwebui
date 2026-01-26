@@ -358,12 +358,13 @@ class Filter:
             payload = {
                 "report": report,
                 "format": format_type,
-                "use_ai": True,  # Use AI generation by default
+                "use_ai": False,  # Default to False - only enable if messages provided
                 "model": "gpt-4o"  # Use gpt-4o for better quality
             }
             
             # Include conversation history for AI generation
-            if messages:
+            if messages and len(messages) > 0:
+                payload["use_ai"] = True  # Enable AI only if we have messages
                 # Convert messages to the format expected by OpenAI Responses API
                 conversation_history = []
                 for msg in messages:
