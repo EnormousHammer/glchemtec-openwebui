@@ -67,8 +67,9 @@ def add_export_proxy_routes(webui_app):
         @webui_app.get("/v1/export/{path:path}")
         @webui_app.post("/v1/export/{path:path}")
         async def proxy_export(request: Request, path: str):
-            """Proxy requests to export service on localhost:8000."""
-            proxy_url = "http://localhost:8000"
+            """Proxy requests to export service on 127.0.0.1:8000."""
+            # Use environment variable if set, otherwise default to 127.0.0.1
+            proxy_url = os.environ.get("EXPORT_SERVICE_URL", "http://127.0.0.1:8000")
             target_url = f"{proxy_url}/v1/export/{path}"
             if request.url.query_string:
                 target_url += f"?{request.url.query_string}"

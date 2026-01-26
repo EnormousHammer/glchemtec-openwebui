@@ -2,9 +2,10 @@
 Export route handler - registers /v1/export/* routes with OpenWebUI.
 This file should be imported by OpenWebUI to add the proxy routes.
 """
+import os
 import httpx
-from fastapi import Request
-from starlette.responses import Response
+from fastapi import Request  # type: ignore
+from starlette.responses import Response  # type: ignore
 
 _ROUTES_REGISTERED = False
 
@@ -26,8 +27,9 @@ def register_export_routes(app):
         @app.get("/v1/export/{path:path}")
         @app.post("/v1/export/{path:path}")
         async def proxy_export(request: Request, path: str):
-            """Proxy requests to export service on localhost:8000."""
-            proxy_url = "http://localhost:8000"
+            """Proxy requests to export service on 127.0.0.1:8000."""
+            # Use environment variable if set, otherwise default to 127.0.0.1
+            proxy_url = os.environ.get("EXPORT_SERVICE_URL", "http://127.0.0.1:8000")
             target_url = f"{proxy_url}/v1/export/{path}"
             if request.url.query_string:
                 target_url += f"?{request.url.query_string}"

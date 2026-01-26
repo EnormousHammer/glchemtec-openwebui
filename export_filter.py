@@ -24,7 +24,7 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable document export")
         debug: bool = Field(default=True, description="Enable debug logging")
         export_service_url: str = Field(
-            default="http://localhost:8000",
+            default="http://127.0.0.1:8000",
             description="URL of the export service (proxy) - internal"
         )
         public_base_url: str = Field(
@@ -45,7 +45,8 @@ class Filter:
         # This prevents OpenWebUI from crashing when introspecting filters
         try:
             # Get export service URL from env if set, otherwise use default
-            export_url = os.environ.get("EXPORT_SERVICE_URL", "http://localhost:8000")
+            # Use 127.0.0.1 instead of localhost for better compatibility
+            export_url = os.environ.get("EXPORT_SERVICE_URL", "http://127.0.0.1:8000")
             # Get public URL for download links
             public_url = os.environ.get("WEBUI_URL", os.environ.get("PUBLIC_URL", ""))
             if not public_url:
@@ -384,7 +385,7 @@ class Filter:
                     else:
                         # Fallback: try to construct from request (last resort)
                         # This won't work but at least we tried
-                        download_url = f"http://localhost:8000/v1/export/download/{file_id}"
+                        download_url = f"http://127.0.0.1:8000/v1/export/download/{file_id}"
                         self._log(f"⚠️ WARNING: No public URL found - download will fail: {download_url}")
                         self._log(f"   Please set WEBUI_URL or PUBLIC_URL environment variable")
                         self._log(f"   File created but download link will not work without public URL")
