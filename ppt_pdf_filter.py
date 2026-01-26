@@ -763,8 +763,9 @@ class Filter:
                     
                     pdf_pages_rendered = 0  # Track if PDF conversion succeeded
                     
-                    # Try PDF conversion if we have at least 60% of needed time (more lenient - allows processing even if tight)
-                    if time_remaining > (total_pdf_time_needed * 0.6):
+                    # Try PDF conversion - be more aggressive, only skip if REALLY not enough time
+                    # Changed from 60% to 40% - we want to try even if time is tight
+                    if time_remaining > (total_pdf_time_needed * 0.4):
                         self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
                         self._update_user_progress(messages, f"Converting {slide_count} slides to PDF... (this may take {int(pdf_timeout_needed)}s)")
                         pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
