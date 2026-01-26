@@ -1513,8 +1513,8 @@ def render_report_pdf(report: dict) -> bytes:
     document_type = report.get("document_type", "pdf")
     
     # Create custom styles with branding colors
-    from reportlab.lib.units import inch
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.units import inch  # type: ignore
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT  # type: ignore
     
     # Custom title style with brand color
     title_style = styles["Title"]
@@ -2082,7 +2082,7 @@ async def download_export_file(file_id: str):
 async def sharepoint_browser_page_old():
     """Old SharePoint browser - redirects to new one."""
     # Redirect to the main sharepoint-browser endpoint
-    from fastapi.responses import RedirectResponse
+    from fastapi.responses import RedirectResponse  # type: ignore
     return RedirectResponse(url="/sharepoint-browser")
 
 

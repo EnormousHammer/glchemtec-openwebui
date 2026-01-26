@@ -12,8 +12,8 @@ try:
 except ImportError:
     # Fallback to inline implementation
     import httpx
-    from fastapi import Request
-    from starlette.responses import Response
+    from fastapi import Request  # type: ignore
+    from starlette.responses import Response  # type: ignore
     
     def register_export_routes(app):
         """Register export proxy routes with OpenWebUI's FastAPI app."""
@@ -108,7 +108,7 @@ def find_and_register_routes():
     """Try to find OpenWebUI's app and register routes."""
     # Method 1: Try open_webui.api.app
     try:
-        import open_webui.api.app as app_module
+        import open_webui.api.app as app_module  # type: ignore
         if hasattr(app_module, 'app'):
             if add_export_proxy_routes(app_module.app):
                 return True
@@ -117,7 +117,7 @@ def find_and_register_routes():
     
     # Method 2: Try open_webui.main
     try:
-        import open_webui.main as main_module
+        import open_webui.main as main_module  # type: ignore
         if hasattr(main_module, 'app'):
             if add_export_proxy_routes(main_module.app):
                 return True

@@ -63,13 +63,13 @@ class Filter:
                     from export_route_handler import register_export_routes
                     # Try to find OpenWebUI's app
                     try:
-                        import open_webui.api.app as app_module
+                        import open_webui.api.app as app_module  # type: ignore
                         if hasattr(app_module, 'app'):
                             register_export_routes(app_module.app)
                             self._log("✅ Export routes registered via open_webui.api.app")
                     except:
                         try:
-                            import open_webui.main as main_module
+                            import open_webui.main as main_module  # type: ignore
                             if hasattr(main_module, 'app'):
                                 register_export_routes(main_module.app)
                                 self._log("✅ Export routes registered via open_webui.main")
