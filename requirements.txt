@@ -14,6 +14,7 @@ pdf2image>=1.16.3
 PyMuPDF>=1.23.0
 fastapi>=0.110.0
 httpx>=0.25.0
+aiohttp>=3.9.0
 uvicorn[standard]>=0.24.0
 reportlab>=4.0.5
 pydantic>=2.0.0
