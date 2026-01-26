@@ -40,10 +40,10 @@ class Filter:
         # Size limits (reduced for memory efficiency)
         max_total_image_mb: float = Field(default=30.0, description="Max total image payload (MB)")
         
-        # Timeouts (balanced for speed and completeness)
-        libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
-        libreoffice_per_slide_timeout: int = Field(default=3, description="Additional seconds per slide")
-        max_timeout: int = Field(default=120, description="Maximum timeout cap (120s) - allows more time for large PPTs")
+        # Timeouts (optimized for speed - LibreOffice is usually faster than these limits)
+        libreoffice_base_timeout: int = Field(default=15, description="Base LibreOffice timeout (sec) - reduced for speed")
+        libreoffice_per_slide_timeout: int = Field(default=1, description="Additional seconds per slide (1s is usually enough)")
+        max_timeout: int = Field(default=60, description="Maximum timeout cap (60s) - should be enough for most PPTs")
         max_processing_time: int = Field(default=120, description="Max total processing time (sec) - allows time for 10-25 slide PPTs")
 
         # Features
@@ -206,6 +206,10 @@ class Filter:
             return unoconv
         # Fallback to direct LibreOffice
         return shutil.which("libreoffice") or shutil.which("soffice")
+    
+    def _is_unoconv(self, lo_path: str) -> bool:
+        """Check if the LibreOffice path is actually unoconv."""
+        return "unoconv" in lo_path.lower() or os.path.basename(lo_path) == "unoconv"
 
     def _count_slides(self, ppt_path: str) -> int:
         """Count slides for timeout calculation."""
@@ -246,32 +250,51 @@ class Filter:
             env = os.environ.copy()
             env["HOME"] = "/tmp"
             env["TMPDIR"] = "/tmp"
-            # Optimize LibreOffice performance
+            # Optimize LibreOffice performance - more aggressive optimizations
             env["SAL_USE_VCLPLUGIN"] = "headless"  # Force headless rendering
             env["SAL_DISABLE_OPENCL"] = "1"  # Disable OpenCL (can cause issues)
             env["SAL_DISABLE_OPENGL"] = "1"  # Disable OpenGL (can cause issues)
+            env["SAL_NO_FONT_LOOKUP"] = "1"  # Skip font lookup (faster)
+            env["SAL_DISABLE_PRINTER"] = "1"  # Disable printer detection (faster startup)
+            env["LIBO_FLATPAK_ENABLE_TLS"] = "0"  # Disable TLS if in flatpak (faster)
 
-            # Use optimized LibreOffice flags with PDF export parameters for 600 DPI
-            # Format: pdf:impress_pdf_Export:{"MaxImageResolution":600,"ReduceImageResolution":false}
+            # Use optimized LibreOffice flags with PDF export parameters for 300 DPI (matches rendering DPI)
+            # Lower DPI = much faster conversion, still excellent quality for spectra
+            pdf_dpi = self.valves.dpi  # Use the same DPI as rendering (300 by default)
             pdf_params = (
                 'pdf:impress_pdf_Export:'
-                '{"MaxImageResolution":{"type":"long","value":"600"},'
+                f'{{"MaxImageResolution":{{"type":"long","value":"{pdf_dpi}"}},'
                 '"ReduceImageResolution":{"type":"boolean","value":"false"},'
                 '"UseLosslessCompression":{"type":"boolean","value":"true"}}'
             )
             
-            cmd = [
-                lo,
-                "--headless",
-                "--nologo",
-                "--nofirststartwizard",
-                "--nodefault",  # Don't load default documents
-                "--nolockcheck",  # Skip lock file checking (faster)
-                f"-env:UserInstallation=file://{profile_dir}",
-                "--convert-to", pdf_params,
-                "--outdir", out_dir,
-                ppt_path,
-            ]
+            # Use unoconv if available (much faster - uses persistent listener)
+            # Note: unoconv doesn't support DPI setting directly, but it's still faster
+            if self._is_unoconv(lo):
+                # unoconv is faster - uses persistent listener
+                output_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(ppt_path))[0] + ".pdf")
+                cmd = [
+                    lo,
+                    "-f", "pdf",  # Format
+                    "-o", output_pdf,
+                    ppt_path,
+                ]
+            else:
+                # Direct LibreOffice - add more speed optimizations
+                cmd = [
+                    lo,
+                    "--headless",
+                    "--nologo",
+                    "--nofirststartwizard",
+                    "--nodefault",  # Don't load default documents
+                    "--nolockcheck",  # Skip lock file checking (faster)
+                    "--invisible",  # Don't show splash screen
+                    "--norestore",  # Don't restore previous session
+                    f"-env:UserInstallation=file://{profile_dir}",
+                    "--convert-to", pdf_params,
+                    "--outdir", out_dir,
+                    ppt_path,
+                ]
             
             self._log(f"Starting LibreOffice conversion...")
             conversion_start = time.time()
@@ -674,19 +697,19 @@ class Filter:
                     self._log(f"Processing PPTX: {slide_count} slides")
                     
                     # Calculate estimated processing time and notify user
-                    # Optimized estimates for small files: ~10s base + 1.5s per slide for conversion + 1s per slide for rendering
-                    # For small files (<5MB), processing is much faster
+                    # Optimized estimates: ~10s base + 0.5-1s per slide for conversion + 1s per slide for rendering
+                    # LibreOffice is usually faster than the timeout, so estimates are conservative
                     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
                     if file_size_mb < 5:
                         # Small file - faster processing
-                        base_time = 10
-                        per_slide_convert = 1.5
+                        base_time = 8
+                        per_slide_convert = 0.8  # Usually faster than 1s per slide
                         per_slide_render = 1.0
                     else:
                         # Larger file - more time needed
-                        base_time = 20
-                        per_slide_convert = 2.5
-                        per_slide_render = 1.5
+                        base_time = 12
+                        per_slide_convert = 1.2  # Usually faster than 1.5s per slide
+                        per_slide_render = 1.2
                     
                     estimated_seconds = base_time + (slide_count * per_slide_convert) + (slide_count * per_slide_render)
                     estimated_seconds = min(estimated_seconds, 90)  # Cap at 90s for small files
@@ -732,8 +755,8 @@ class Filter:
                         self.valves.libreoffice_base_timeout + (slide_count * self.valves.libreoffice_per_slide_timeout),
                         self.valves.max_timeout
                     )
-                    # More realistic render time estimate: ~1.5s per page for 600 DPI (optimized)
-                    render_time_needed = max(5, slide_count * 1.5)  # At least 5s, or 1.5s per slide
+                    # More realistic render time estimate: ~1s per page for 300 DPI (optimized)
+                    render_time_needed = max(5, slide_count * 1.0)  # At least 5s, or 1s per slide
                     total_pdf_time_needed = pdf_timeout_needed + render_time_needed + 5  # Reduced buffer to 5s
                     
                     self._log(f"Time check: {int(time_remaining)}s remaining, need ~{int(total_pdf_time_needed)}s for PDF (conversion: {int(pdf_timeout_needed)}s, render: {int(render_time_needed)}s)")
