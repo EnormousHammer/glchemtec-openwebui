@@ -520,7 +520,7 @@ class Filter:
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         """
         Input filter - detects export requests and generates files BEFORE assistant responds.
-        This is the better approach: generate file early, then assistant can reference it.
+        Returns immediate assistant response with download link, preventing LLM call.
         """
         self._log("Inlet called")
         if not self.valves.enabled:
@@ -532,7 +532,7 @@ class Filter:
             self._log("No messages in body")
             return body
 
-        # Check the last user message for export requests
+        # 1) Detect export request from the last user message
         last_user_msg = None
         for msg in reversed(messages):
             if msg.get("role") == "user":
@@ -545,40 +545,48 @@ class Filter:
         user_content = self._extract_text_content(last_user_msg.get("content", ""))
         export_format = self._detect_export_request(user_content)
 
-        if export_format:
-            self._log(f"Export request detected in inlet: {export_format.upper()}")
-            self._log(f"Processing {len(messages)} messages for export")
+        if not export_format:
+            return body  # normal flow
+
+        self._log(f"Export request detected in inlet: {export_format.upper()}")
+        self._log(f"Processing {len(messages)} messages for export")
+        
+        # 2) Build report from messages (existing logic)
+        report = self._build_report_from_conversation(messages, export_format)
+        self._log(f"Report structure: title='{report.get('title')}', sections={len(report.get('sections', []))}")
+        
+        # 3) Create export via proxy (existing logic)
+        export_result = self._create_export_with_link(report, export_format, messages)
+        
+        if export_result and export_result.get("success"):
+            download_url = export_result.get("download_url", "")
+            filename = export_result.get("filename", f"export.{export_format}")
+            file_size = export_result.get("size_bytes", 0)
+            file_size_kb = file_size // 1024 if file_size else 0
             
-            # Generate the file and get a download link
-            # Build basic report structure (will be enhanced by AI if use_ai=True)
-            report = self._build_report_from_conversation(messages, export_format)
-            self._log(f"Report structure: title='{report.get('title')}', sections={len(report.get('sections', []))}")
-            # Pass messages for AI generation
-            export_result = self._create_export_with_link(report, export_format, messages)
+            self._log(f"Export file created: {filename} ({file_size_kb}KB)")
             
-            if export_result and export_result.get("success"):
-                filename = export_result.get("filename", f"export.{export_format}")
-                download_url = export_result.get("download_url", "")
-                file_size = export_result.get("size_bytes", 0)
-                file_size_kb = file_size // 1024
-                
-                self._log(f"Export file created: {filename} ({file_size_kb}KB)")
-                
-                # download_url is now a data URL (base64) - works directly in browser
-                full_download_url = download_url
-                
-                # Store export info in metadata for outlet
-                # DO NOT modify user message - let the AI respond naturally, then outlet adds download link
-                if "metadata" not in body:
-                    body["metadata"] = {}
-                body["metadata"]["export_file"] = {
-                    "filename": filename,
-                    "download_url": full_download_url,
-                    "format": export_format,
-                    "size": file_size
-                }
-            else:
-                self._log("Failed to create export file in inlet")
+            # 4) Inject assistant reply WITH CLICKABLE LINK
+            body["messages"].append({
+                "role": "assistant",
+                "content": f"✅ Export ready:\n\n**Download:** [{filename}]({download_url})\n\n*File size: {file_size_kb}KB*"
+            })
+            
+            # 5) CRITICAL: Stop OpenWebUI from calling the model
+            body["max_tokens"] = 0
+            body["stream"] = False
+            
+            self._log(f"✅ Added assistant message with download link, prevented LLM call")
+        else:
+            # Return an assistant message anyway (no model call)
+            body["messages"].append({
+                "role": "assistant",
+                "content": "❌ Export failed (no URL returned). Check proxy logs: /v1/export/create"
+            })
+            # IMPORTANT: prevent the LLM call by forcing messages to end here
+            body["max_tokens"] = 0
+            body["stream"] = False
+            self._log("❌ Export creation failed, added error message")
 
         return body
 
