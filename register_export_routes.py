@@ -83,14 +83,27 @@ def add_export_proxy_routes(webui_app):
                     else:
                         proxy_response = await client.post(target_url, content=body, headers=headers, follow_redirects=True)
                     
-                    response_headers = {k: v for k, v in proxy_response.headers.items() 
-                                      if k.lower() not in ["connection", "transfer-encoding"]}
+                    # CRITICAL: Preserve ALL headers, especially Content-Disposition for downloads
+                    response_headers = {}
+                    for k, v in proxy_response.headers.items():
+                        # Skip hop-by-hop headers that shouldn't be forwarded
+                        if k.lower() not in ["connection", "transfer-encoding", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade"]:
+                            response_headers[k] = v
+                    
+                    # Ensure Content-Disposition is preserved (critical for file downloads)
+                    if "content-disposition" not in {h.lower() for h in response_headers.keys()}:
+                        # If proxy didn't set it, try to get it from response
+                        if "content-disposition" in proxy_response.headers:
+                            response_headers["Content-Disposition"] = proxy_response.headers["content-disposition"]
+                    
+                    # Get content type
+                    content_type = proxy_response.headers.get("content-type") or proxy_response.headers.get("Content-Type")
                     
                     return Response(
                         content=proxy_response.content,
                         status_code=proxy_response.status_code,
                         headers=response_headers,
-                        media_type=proxy_response.headers.get("content-type")
+                        media_type=content_type
                     )
                 except Exception as e:
                     return Response(content=f"Proxy error: {str(e)}", status_code=502)
@@ -140,13 +153,29 @@ def find_and_register_routes():
 
 if __name__ == "__main__":
     print("[EXPORT-ROUTES] Starting route registration script...")
-    max_attempts = 30
+    max_attempts = 60  # Increased to 60 attempts (2 minutes total)
     for i in range(max_attempts):
         if find_and_register_routes():
-            print("[EXPORT-ROUTES] Routes registered successfully!")
-            sys.exit(0)
+            print("[EXPORT-ROUTES] ✅ Routes registered successfully!")
+            # Keep running to retry if routes get lost (OpenWebUI might restart)
+            print("[EXPORT-ROUTES] Monitoring for route registration...")
+            while True:
+                time.sleep(30)  # Check every 30 seconds
+                # Verify routes still exist
+                try:
+                    import open_webui.api.app as app_module  # type: ignore
+                    if hasattr(app_module, 'app'):
+                        routes_exist = any('/v1/export' in str(route.path) for route in app_module.app.routes if hasattr(route, 'path'))
+                        if not routes_exist:
+                            print("[EXPORT-ROUTES] ⚠️ Routes lost, re-registering...")
+                            find_and_register_routes()
+                except:
+                    pass
         print(f"[EXPORT-ROUTES] Attempt {i+1}/{max_attempts}: OpenWebUI not ready yet, waiting...")
         time.sleep(2)
     
-    print("[EXPORT-ROUTES] ⚠️ Failed to register routes after 30 attempts")
-    sys.exit(1)
+    print("[EXPORT-ROUTES] ⚠️ Failed to register routes after 60 attempts - continuing anyway (filter will retry)")
+    # Don't exit - let the filter try to register on first request
+    while True:
+        time.sleep(60)  # Keep trying periodically
+        find_and_register_routes()

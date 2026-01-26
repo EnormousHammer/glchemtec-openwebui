@@ -42,14 +42,27 @@ def register_export_routes(app):
                     else:
                         proxy_response = await client.post(target_url, content=body, headers=headers, follow_redirects=True)
                     
-                    response_headers = {k: v for k, v in proxy_response.headers.items() 
-                                      if k.lower() not in ["connection", "transfer-encoding"]}
+                    # CRITICAL: Preserve ALL headers, especially Content-Disposition for downloads
+                    response_headers = {}
+                    for k, v in proxy_response.headers.items():
+                        # Skip hop-by-hop headers that shouldn't be forwarded
+                        if k.lower() not in ["connection", "transfer-encoding", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade"]:
+                            response_headers[k] = v
+                    
+                    # Ensure Content-Disposition is preserved (critical for file downloads)
+                    if "content-disposition" not in {h.lower() for h in response_headers.keys()}:
+                        # If proxy didn't set it, try to get it from response
+                        if "content-disposition" in proxy_response.headers:
+                            response_headers["Content-Disposition"] = proxy_response.headers["content-disposition"]
+                    
+                    # Get content type
+                    content_type = proxy_response.headers.get("content-type") or proxy_response.headers.get("Content-Type")
                     
                     return Response(
                         content=proxy_response.content,
                         status_code=proxy_response.status_code,
                         headers=response_headers,
-                        media_type=proxy_response.headers.get("content-type")
+                        media_type=content_type
                     )
                 except Exception as e:
                     print(f"[EXPORT-ROUTES] Proxy error: {e}")
