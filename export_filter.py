@@ -348,7 +348,7 @@ class Filter:
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
     
-    def _create_export_with_link(self, report: Dict[str, Any], format_type: str) -> Optional[Dict[str, Any]]:
+    def _create_export_with_link(self, report: Dict[str, Any], format_type: str, messages: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
         """Create export file via proxy endpoint and return download link."""
         try:
             # Use the proxy's export/create endpoint which handles file storage and returns a download URL
@@ -357,11 +357,43 @@ class Filter:
             
             payload = {
                 "report": report,
-                "format": format_type
+                "format": format_type,
+                "use_ai": True,  # Use AI generation by default
+                "model": "gpt-4o"  # Use gpt-4o for better quality
             }
             
+            # Include conversation history for AI generation
+            if messages:
+                # Convert messages to the format expected by OpenAI Responses API
+                conversation_history = []
+                for msg in messages:
+                    role = msg.get("role", "")
+                    content = msg.get("content", "")
+                    
+                    # Convert content to Responses API format
+                    if isinstance(content, str):
+                        content_items = [{"type": "input_text", "text": content}]
+                    elif isinstance(content, list):
+                        content_items = []
+                        for item in content:
+                            if isinstance(item, dict):
+                                # Already in Responses API format
+                                content_items.append(item)
+                            elif isinstance(item, str):
+                                content_items.append({"type": "input_text", "text": item})
+                    else:
+                        content_items = [{"type": "input_text", "text": str(content)}]
+                    
+                    conversation_history.append({
+                        "role": role,
+                        "content": content_items
+                    })
+                
+                payload["conversation"] = conversation_history
+                self._log(f"Including {len(conversation_history)} messages for AI generation")
+            
             headers = {"Content-Type": "application/json"}
-            response = requests.post(url, json=payload, headers=headers, timeout=60)
+            response = requests.post(url, json=payload, headers=headers, timeout=120)  # Increased timeout for AI generation
             
             self._log(f"Export creation response: {response.status_code}")
             
@@ -517,9 +549,11 @@ class Filter:
             self._log(f"Processing {len(messages)} messages for export")
             
             # Generate the file and get a download link
+            # Build basic report structure (will be enhanced by AI if use_ai=True)
             report = self._build_report_from_conversation(messages, export_format)
             self._log(f"Report structure: title='{report.get('title')}', sections={len(report.get('sections', []))}")
-            export_result = self._create_export_with_link(report, export_format)
+            # Pass messages for AI generation
+            export_result = self._create_export_with_link(report, export_format, messages)
             
             if export_result and export_result.get("success"):
                 filename = export_result.get("filename", f"export.{export_format}")

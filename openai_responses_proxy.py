@@ -1982,16 +1982,205 @@ async def generate_report_docx(report: dict):
     )
 
 
+async def _generate_ai_report_internal(conversation_history: list, format_type: str = "pdf", model: str = "gpt-4o") -> dict:
+    """
+    Internal function to generate AI report using OpenAI Responses API.
+    Returns structured report dict.
+    """
+    if not conversation_history:
+        raise ValueError("No conversation history provided")
+    
+    log(f"Generating AI report: {len(conversation_history)} messages, format={format_type}, model={model}")
+    
+    # Create a system message that asks for structured report format
+    system_prompt = """You are a professional technical writer. Create a well-structured, comprehensive report from the conversation history.
+
+Format your response as a JSON object with this exact structure:
+{
+  "title": "Clear, descriptive title",
+  "subtitle": "Optional subtitle",
+  "summary": "Executive summary (2-3 sentences)",
+  "sections": [
+    {
+      "heading": "Section title",
+      "body": "Main content paragraph(s)",
+      "bullets": ["Key point 1", "Key point 2", ...],
+      "table": {
+        "headers": ["Column 1", "Column 2"],
+        "rows": [["Data 1", "Data 2"], ...]
+      }
+    }
+  ],
+  "conclusions": ["Conclusion point 1", "Conclusion point 2", ...],
+  "recommendations": ["Recommendation 1", "Recommendation 2", ...]
+}
+
+Guidelines:
+- Create logical sections based on topics discussed
+- Include key findings, data, and insights
+- Use tables for structured data
+- Add conclusions and recommendations if applicable
+- Be concise but comprehensive
+- Maintain technical accuracy
+- Return ONLY valid JSON, no markdown formatting or code blocks"""
+    
+    # Add the system prompt as the first message
+    enhanced_history = [
+        {
+            "role": "system",
+            "content": [{"type": "input_text", "text": system_prompt}]
+        }
+    ] + conversation_history
+    
+    # Add a final user message requesting the report
+    enhanced_history.append({
+        "role": "user",
+        "content": [{"type": "input_text", "text": f"Please create a professional {format_type.upper()} report from this conversation. Structure it clearly with sections, key findings, and actionable insights."}]
+    })
+    
+    # Call OpenAI Responses API
+    response_data = await call_responses_api(model, enhanced_history)
+    
+    # Extract the assistant's response
+    output = response_data.get("output", [])
+    if not output:
+        raise ValueError("No response from OpenAI")
+    
+    # Get the text content from the response
+    ai_text = ""
+    for item in output:
+        if item.get("type") == "text":
+            ai_text += item.get("text", "")
+    
+    if not ai_text:
+        raise ValueError("Empty response from OpenAI")
+    
+    log(f"Received AI response: {len(ai_text)} characters")
+    
+    # Try to parse JSON from the response
+    # The AI might wrap it in markdown code blocks, so clean it up
+    ai_text = ai_text.strip()
+    if ai_text.startswith("```json"):
+        ai_text = ai_text[7:]
+    if ai_text.startswith("```"):
+        ai_text = ai_text[3:]
+    if ai_text.endswith("```"):
+        ai_text = ai_text[:-3]
+    ai_text = ai_text.strip()
+    
+    try:
+        ai_report = json.loads(ai_text)
+    except json.JSONDecodeError as e:
+        log(f"Failed to parse AI response as JSON: {e}")
+        log(f"Response text (first 500 chars): {ai_text[:500]}")
+        # Fallback: create a simple report structure from the text
+        ai_report = {
+            "title": "AI-Generated Report",
+            "subtitle": "Generated from conversation",
+            "summary": ai_text[:200] + "..." if len(ai_text) > 200 else ai_text,
+            "sections": [{
+                "heading": "Report Content",
+                "body": ai_text,
+                "bullets": []
+            }],
+            "conclusions": [],
+            "recommendations": []
+        }
+    
+    # Validate and enhance the report structure
+    if not isinstance(ai_report, dict):
+        raise ValueError("Invalid report structure from AI")
+    
+    # Ensure required fields exist
+    if "title" not in ai_report:
+        ai_report["title"] = "AI-Generated Report"
+    if "sections" not in ai_report:
+        ai_report["sections"] = []
+    if not ai_report["sections"]:
+        # If no sections, create one from the summary or body
+        body_text = ai_report.get("summary", ai_report.get("body", "No content available"))
+        ai_report["sections"] = [{
+            "heading": "Report Content",
+            "body": body_text,
+            "bullets": []
+        }]
+    
+    log(f"✅ AI report generated: title='{ai_report.get('title')}', sections={len(ai_report.get('sections', []))}")
+    
+    return ai_report
+
+
+@app.post("/v1/export/generate-ai-report")
+async def generate_ai_report(request: Request):
+    """
+    Use OpenAI Responses API to generate an intelligent, structured report from conversation.
+    Returns structured report JSON that can be rendered as PDF/Word.
+    """
+    try:
+        data = await request.json()
+        conversation_history = data.get("conversation", [])
+        format_type = data.get("format", "pdf").lower()
+        model = data.get("model", "gpt-4o")
+        
+        ai_report = await _generate_ai_report_internal(conversation_history, format_type, model)
+        
+        return JSONResponse({
+            "success": True,
+            "report": ai_report
+        })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        log(f"Error in generate_ai_report: {e}")
+        import traceback
+        log(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Export generation failed: {str(e)}")
+
+
 @app.post("/v1/export/create")
 async def create_export_file(request: Request):
     """
     Create an export file and return a download link.
+    Now supports both AI-generated reports and raw report structures.
     Returns JSON with download_url that can be clicked directly.
     """
     try:
         data = await request.json()
         report = data.get("report", {})
         format_type = data.get("format", "pdf").lower()
+        use_ai = data.get("use_ai", True)  # Default to AI generation
+        conversation = data.get("conversation", [])
+        model = data.get("model", "gpt-4o")
+        
+        # If use_ai is True and we have conversation history, generate AI report first
+        if use_ai and conversation:
+            try:
+                log(f"Generating AI report for {format_type} export...")
+                ai_report = await _generate_ai_report_internal(conversation, format_type, model)
+                
+                # Merge AI report with branding/metadata from original report
+                # Preserve branding info
+                if "company_name" in report:
+                    ai_report["company_name"] = report["company_name"]
+                if "logo_path" in report:
+                    ai_report["logo_path"] = report["logo_path"]
+                if "primary_color" in report:
+                    ai_report["primary_color"] = report["primary_color"]
+                if "secondary_color" in report:
+                    ai_report["secondary_color"] = report["secondary_color"]
+                if "document_type" in report:
+                    ai_report["document_type"] = report["document_type"]
+                # Add date/author if not present
+                if "date" not in ai_report:
+                    ai_report["date"] = report.get("date", "")
+                if "author" not in ai_report:
+                    ai_report["author"] = report.get("author", "")
+                report = ai_report
+                log(f"✅ Using AI-generated report with {len(report.get('sections', []))} sections")
+            except Exception as e:
+                log(f"⚠️ AI report generation failed, falling back to raw report: {e}")
+                # Continue with raw report if AI fails
         
         if format_type == "pdf":
             file_bytes = render_report_pdf(report)
