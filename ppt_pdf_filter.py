@@ -31,14 +31,14 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
 
-        # Rendering quality (high DPI for spectra clarity)
-        dpi: int = Field(default=600, description="DPI for PDF rendering (600 = high quality for spectra/NMR)")
-        max_pages: int = Field(default=30, description="Max pages/slides to render")
-        output_format: str = Field(default="png", description="png or jpeg")
+        # Rendering quality (reduced DPI for memory efficiency - 300 DPI still excellent for spectra)
+        dpi: int = Field(default=300, description="DPI for PDF rendering (300 = good quality, memory efficient)")
+        max_pages: int = Field(default=20, description="Max pages/slides to render (reduced for memory)")
+        output_format: str = Field(default="jpeg", description="png or jpeg (jpeg uses less memory)")
         jpeg_quality: int = Field(default=85, description="JPEG quality if using jpeg")
 
-        # Size limits
-        max_total_image_mb: float = Field(default=50.0, description="Max total image payload (MB)")
+        # Size limits (reduced for memory efficiency)
+        max_total_image_mb: float = Field(default=30.0, description="Max total image payload (MB)")
         
         # Timeouts (balanced for speed and completeness)
         libreoffice_base_timeout: int = Field(default=30, description="Base LibreOffice timeout (sec)")
@@ -285,8 +285,9 @@ class Filter:
     # =========================================================================
 
     def _convert_pdf_to_images(self, pdf_path: str, output_dir: str) -> List[str]:
-        """Render PDF pages to images with timing diagnostics."""
+        """Render PDF pages to images one at a time for memory efficiency."""
         import time
+        import gc
         start_time = time.time()
         paths = []
         try:
@@ -294,46 +295,64 @@ class Filter:
 
             fmt = self.valves.output_format.lower()
             if fmt not in ("png", "jpeg", "jpg"):
-                fmt = "png"
+                fmt = "jpeg"  # Default to JPEG for memory efficiency
 
             pdf_size = os.path.getsize(pdf_path) / 1024 / 1024
-            self._log(f"Rendering PDF at {self.valves.dpi} DPI (PDF size: {pdf_size:.1f}MB)")
-
-            render_start = time.time()
-            images = convert_from_path(
-                pdf_path,
-                dpi=self.valves.dpi,
-                first_page=1,
-                last_page=self.valves.max_pages,
-                thread_count=1,  # Single thread to avoid memory issues
-            )
-            render_time = time.time() - render_start
-            self._log(f"PDF2image conversion took {render_time:.1f}s for {len(images)} pages")
+            self._log(f"Rendering PDF at {self.valves.dpi} DPI (PDF size: {pdf_size:.1f}MB) - processing one page at a time")
 
             max_bytes = int(self.valves.max_total_image_mb * 1024 * 1024)
             total_bytes = 0
+            max_pages = min(self.valves.max_pages, 20)  # Hard cap at 20 pages for memory
 
-            save_start = time.time()
-            for i, img in enumerate(images, start=1):
-                if fmt == "png":
-                    out_path = os.path.join(output_dir, f"page_{i:03d}.png")
-                    img.save(out_path, format="PNG")
-                else:
-                    out_path = os.path.join(output_dir, f"page_{i:03d}.jpg")
-                    img.convert("RGB").save(out_path, format="JPEG", quality=self.valves.jpeg_quality)
+            # Process pages ONE AT A TIME to avoid loading all into memory
+            for page_num in range(1, max_pages + 1):
+                try:
+                    # Render only this page
+                    render_start = time.time()
+                    images = convert_from_path(
+                        pdf_path,
+                        dpi=self.valves.dpi,
+                        first_page=page_num,
+                        last_page=page_num,  # Only this page
+                        thread_count=1,
+                    )
+                    
+                    if not images:
+                        self._log(f"No image returned for page {page_num} - stopping")
+                        break
+                    
+                    img = images[0]  # Only one image
+                    render_time = time.time() - render_start
+                    
+                    # Save immediately
+                    if fmt == "png":
+                        out_path = os.path.join(output_dir, f"page_{page_num:03d}.png")
+                        img.save(out_path, format="PNG", optimize=True)
+                    else:
+                        out_path = os.path.join(output_dir, f"page_{page_num:03d}.jpg")
+                        img.convert("RGB").save(out_path, format="JPEG", quality=self.valves.jpeg_quality, optimize=True)
 
-                size = os.path.getsize(out_path)
-                total_bytes += size
-                paths.append(out_path)
+                    # Clear image from memory immediately
+                    del img
+                    del images
+                    gc.collect()  # Force garbage collection
 
-                if total_bytes > max_bytes:
-                    self._log(f"Size limit reached at page {i}")
-                    break
+                    size = os.path.getsize(out_path)
+                    total_bytes += size
+                    paths.append(out_path)
+                    
+                    self._log(f"Page {page_num}: {size/1024:.1f}KB (total: {total_bytes/1024/1024:.1f}MB, {render_time:.1f}s)")
 
-            save_time = time.time() - save_start
+                    if total_bytes > max_bytes:
+                        self._log(f"Size limit reached at page {page_num}")
+                        break
+                        
+                except Exception as e:
+                    self._log(f"Error processing page {page_num}: {e}")
+                    break  # Stop on error
+
             total_time = time.time() - start_time
-            self._log(f"Rendered {len(paths)} pages ({total_bytes/1024/1024:.1f}MB)")
-            self._log(f"Timing: conversion={render_time:.1f}s, save={save_time:.1f}s, total={total_time:.1f}s")
+            self._log(f"Rendered {len(paths)} pages ({total_bytes/1024/1024:.1f}MB total, {total_time:.1f}s)")
 
         except Exception as e:
             self._log(f"PDF rendering error: {e}")
@@ -514,18 +533,20 @@ class Filter:
     # IMAGE UTILITIES
     # =========================================================================
 
-    def _to_data_url(self, img_path: str, max_size_mb: float = 2.0) -> Optional[str]:
-        """Convert image file to base64 data URL. Faster with size limits."""
+    def _to_data_url(self, img_path: str, max_size_mb: float = 1.5) -> Optional[str]:
+        """Convert image file to base64 data URL. Memory-efficient with size limits."""
         try:
             if not os.path.exists(img_path):
                 return None
             
-            # Check file size - skip if too large (reduced to 2MB for speed)
+            # Check file size - skip if too large (reduced to 1.5MB for memory efficiency)
             size_mb = os.path.getsize(img_path) / (1024 * 1024)
             if size_mb > max_size_mb:
                 self._log(f"Skipping large image: {size_mb:.1f}MB (limit: {max_size_mb}MB)")
                 return None
             
+            # Read in chunks to avoid loading entire file at once if possible
+            # For small files (<1.5MB), read all at once is fine
             with open(img_path, "rb") as f:
                 data = f.read()
             
@@ -541,9 +562,11 @@ class Filter:
                 ".jpeg": "image/jpeg",
                 ".gif": "image/gif",
                 ".webp": "image/webp",
-            }.get(ext, "image/png")
+            }.get(ext, "image/jpeg")  # Default to JPEG for memory efficiency
             
             b64 = base64.b64encode(data).decode("utf-8")
+            # Clear data from memory immediately
+            del data
             return f"data:{mime};base64,{b64}"
         except Exception as e:
             self._log(f"Error encoding image: {e}")
@@ -680,10 +703,10 @@ class Filter:
                                 page_paths = self._convert_pdf_to_images(pdf_path, tmp)
                                 pdf_pages_rendered = len(page_paths)
                                 
-                                # Limit images to prevent timeout - process max 25 pages (handles typical 10-25 slide PPTs)
-                                max_pages_to_encode = min(25, pdf_pages_rendered)
+                                # Limit images to prevent timeout and memory issues - process max 15 pages
+                                max_pages_to_encode = min(15, pdf_pages_rendered)
                                 if pdf_pages_rendered > max_pages_to_encode:
-                                    self._log(f"Limiting to {max_pages_to_encode} pages (out of {pdf_pages_rendered}) to prevent timeout")
+                                    self._log(f"Limiting to {max_pages_to_encode} pages (out of {pdf_pages_rendered}) to prevent memory/timeout")
                                     page_paths = page_paths[:max_pages_to_encode]
                                 
                                 # Encode images with timeout check
@@ -696,7 +719,7 @@ class Filter:
                                             self._log(f"Stopping image encoding - {int(self.valves.max_processing_time - elapsed)}s before timeout")
                                             break
                                     
-                                    url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
+                                    url = self._to_data_url(p, max_size_mb=1.5)  # Reduced to 1.5MB per image for memory
                                     if url:
                                         all_images.append({"type": "image_url", "image_url": {"url": url}})
                                         encoded_count += 1
@@ -759,9 +782,9 @@ class Filter:
                     if time_remaining > 10:  # Need at least 10s for embedded image extraction
                         img_paths = self._extract_pptx_images(file_path, tmp)
                         embedded_count = len(img_paths)
-                        max_embedded = min(15, embedded_count)  # Limit to 15 for speed
+                        max_embedded = min(10, embedded_count)  # Limit to 10 for memory efficiency
                         if embedded_count > max_embedded:
-                            self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent timeout")
+                            self._log(f"Limiting embedded images to {max_embedded} (out of {embedded_count}) to prevent memory issues")
                             img_paths = img_paths[:max_embedded]
                         
                         encoded_embedded = 0
@@ -773,7 +796,7 @@ class Filter:
                                     self._log(f"Stopping embedded image extraction - {int(self.valves.max_processing_time - elapsed)}s before timeout")
                                     break
                             
-                            url = self._to_data_url(p, max_size_mb=2.0)  # Allow up to 2MB per image
+                            url = self._to_data_url(p, max_size_mb=1.5)  # Reduced to 1.5MB per image for memory
                             if url:
                                 all_images.append({"type": "image_url", "image_url": {"url": url}})
                                 encoded_embedded += 1

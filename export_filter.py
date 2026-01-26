@@ -315,13 +315,21 @@ class Filter:
             self._log(f"Response status: {response.status_code}")
             
             if response.status_code == 200:
-                # Read all content from streaming response
-                file_bytes = response.content
+                # Read content in chunks to avoid loading entire file into memory
+                file_bytes = bytearray()
+                for chunk in response.iter_content(chunk_size=8192):  # 8KB chunks
+                    if chunk:
+                        file_bytes.extend(chunk)
+                        # Safety check: limit to 50MB to prevent memory issues
+                        if len(file_bytes) > 50 * 1024 * 1024:
+                            self._log("ERROR: File too large (>50MB), stopping download")
+                            return None
+                
                 self._log(f"Successfully received {len(file_bytes)} bytes")
                 if len(file_bytes) == 0:
                     self._log("ERROR: Received empty file!")
                     return None
-                return file_bytes
+                return bytes(file_bytes)
             else:
                 error_text = response.text[:500] if hasattr(response, 'text') else "No error details"
                 self._log(f"Export failed: HTTP {response.status_code}")

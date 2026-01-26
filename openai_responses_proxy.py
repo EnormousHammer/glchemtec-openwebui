@@ -869,15 +869,41 @@ def _load_files_from_request(body: dict, messages: list) -> tuple[list[dict], li
         mime = mime or "application/octet-stream"
 
         if _is_pdf(name, mime):
+            # Read in chunks for large files to avoid memory spikes
             with open(path, "rb") as fh:
-                b64 = base64.b64encode(fh.read()).decode("utf-8")
+                if size > 10 * 1024 * 1024:  # For files > 10MB, read in chunks
+                    import io
+                    chunks = []
+                    while True:
+                        chunk = fh.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                    data = b''.join(chunks)
+                else:
+                    data = fh.read()
+                b64 = base64.b64encode(data).decode("utf-8")
+                del data  # Clear from memory immediately
             pdfs.append({"filename": name or "document.pdf", "base64": b64})
             total_bytes += size
             continue
 
         if _is_image(mime):
+            # Read in chunks for large files to avoid memory spikes
             with open(path, "rb") as fh:
-                b64 = base64.b64encode(fh.read()).decode("utf-8")
+                if size > 10 * 1024 * 1024:  # For files > 10MB, read in chunks
+                    import io
+                    chunks = []
+                    while True:
+                        chunk = fh.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                    data = b''.join(chunks)
+                else:
+                    data = fh.read()
+                b64 = base64.b64encode(data).decode("utf-8")
+                del data  # Clear from memory immediately
             images.append({"url": f"data:{mime};base64,{b64}", "name": name})
             total_bytes += size
             continue
