@@ -75,6 +75,39 @@ class Filter:
     def _log(self, msg: str) -> None:
         if self.valves.debug:
             print(f"[PPT-PDF-VISION] {msg}")
+    
+    def _update_user_progress(self, messages: list, status: str) -> None:
+        """Update user message with progress status so they know we're working."""
+        if not messages:
+            return
+        last_user_msg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                last_user_msg = msg
+                break
+        if not last_user_msg:
+            return
+        
+        progress_text = f"\n\n[🔄 {status}]"
+        
+        # Update or append progress message
+        if isinstance(last_user_msg.get("content"), str):
+            # Remove old progress messages and add new one
+            content = last_user_msg["content"]
+            # Remove previous progress messages (lines starting with [🔄 or [⏱️)
+            lines = content.split('\n')
+            filtered = [line for line in lines if not (line.strip().startswith('[🔄') or line.strip().startswith('[⏱️'))]
+            last_user_msg["content"] = '\n'.join(filtered) + progress_text
+        elif isinstance(last_user_msg.get("content"), list):
+            # Remove old progress items and add new one
+            content_list = last_user_msg.get("content", [])
+            filtered = [item for item in content_list if not (
+                isinstance(item, dict) and 
+                item.get("type") == "text" and 
+                (item.get("text", "").strip().startswith('[🔄') or item.get("text", "").strip().startswith('[⏱️'))
+            )]
+            filtered.append({"type": "text", "text": progress_text})
+            last_user_msg["content"] = filtered
 
     # =========================================================================
     # FILE DISCOVERY - Only current message, not history
@@ -309,6 +342,7 @@ class Filter:
                 try:
                     # Render only this page
                     render_start = time.time()
+                    self._log(f"Rendering page {page_num}/{max_pages}...")
                     images = convert_from_path(
                         pdf_path,
                         dpi=self.valves.dpi,
@@ -640,10 +674,24 @@ class Filter:
                     self._log(f"Processing PPTX: {slide_count} slides")
                     
                     # Calculate estimated processing time and notify user
-                    # Estimate: ~30s base + 3s per slide for conversion + 2s per slide for rendering
-                    estimated_seconds = 30 + (slide_count * 3) + (slide_count * 2)
+                    # Optimized estimates for small files: ~10s base + 1.5s per slide for conversion + 1s per slide for rendering
+                    # For small files (<5MB), processing is much faster
+                    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    if file_size_mb < 5:
+                        # Small file - faster processing
+                        base_time = 10
+                        per_slide_convert = 1.5
+                        per_slide_render = 1.0
+                    else:
+                        # Larger file - more time needed
+                        base_time = 20
+                        per_slide_convert = 2.5
+                        per_slide_render = 1.5
+                    
+                    estimated_seconds = base_time + (slide_count * per_slide_convert) + (slide_count * per_slide_render)
+                    estimated_seconds = min(estimated_seconds, 90)  # Cap at 90s for small files
                     estimated_minutes = max(1, round(estimated_seconds / 60))
-                    estimated_max_minutes = max(1, round((estimated_seconds + 30) / 60))  # Add buffer
+                    estimated_max_minutes = max(1, round((estimated_seconds + 15) / 60))  # Smaller buffer
                     
                     # Add user notification to the message
                     last_user_msg = None
@@ -666,10 +714,12 @@ class Filter:
                             })
                     
                     # Extract text (FAST - always do this first)
+                    self._update_user_progress(messages, f"Extracting text from {file_name}...")
                     text = self._extract_pptx_text(file_path)
                     if text:
                         all_text.append(f"=== {file_name} ===\n{text}")
                         self._log(f"Extracted text ({len(text)} chars)")
+                        self._update_user_progress(messages, f"✓ Text extracted ({len(text)} chars). Converting to PDF...")
 
                     # PRIORITY: Check time and do PDF conversion FIRST (before embedded images)
                     # PDF conversion gives us full slide images which are more important than embedded images
@@ -693,6 +743,7 @@ class Filter:
                     # Try PDF conversion if we have at least 60% of needed time (more lenient - allows processing even if tight)
                     if time_remaining > (total_pdf_time_needed * 0.6):
                         self._log(f"Attempting PDF conversion ({slide_count} slides, {int(time_remaining)}s available)")
+                        self._update_user_progress(messages, f"Converting {slide_count} slides to PDF... (this may take {int(pdf_timeout_needed)}s)")
                         pdf_path = self._convert_pptx_to_pdf(file_path, tmp)
                         if pdf_path:
                             elapsed = time.time() - start_time
@@ -700,6 +751,7 @@ class Filter:
                             self._log(f"PDF conversion completed in {elapsed:.1f}s, {int(time_remaining)}s remaining for rendering")
                             if time_remaining > 5:  # Need at least 5s for rendering
                                 self._log(f"Rendering PDF pages ({int(time_remaining)}s remaining)")
+                                self._update_user_progress(messages, f"✓ PDF converted! Rendering {slide_count} pages to images...")
                                 page_paths = self._convert_pdf_to_images(pdf_path, tmp)
                                 pdf_pages_rendered = len(page_paths)
                                 
@@ -711,7 +763,12 @@ class Filter:
                                 
                                 # Encode images with timeout check
                                 encoded_count = 0
+                                total_pages = len(page_paths)
                                 for i, p in enumerate(page_paths):
+                                    # Update progress every 3 pages
+                                    if i > 0 and i % 3 == 0:
+                                        self._update_user_progress(messages, f"Encoding images... {i}/{total_pages} pages done")
+                                    
                                     # Check time remaining every 5 images (less frequent checks for speed)
                                     if i > 0 and i % 5 == 0:
                                         elapsed = time.time() - start_time
@@ -726,6 +783,7 @@ class Filter:
                                 
                                 elapsed_after_render = time.time() - start_time
                                 self._log(f"Rendered {encoded_count}/{pdf_pages_rendered} PDF pages (total time: {elapsed_after_render:.1f}s)")
+                                self._update_user_progress(messages, f"✓ Complete! Processed {encoded_count} pages in {elapsed_after_render:.1f}s")
                             else:
                                 self._log(f"Skipped PDF rendering - only {int(time_remaining)}s remaining (need 5s+)")
                         else:
@@ -807,6 +865,9 @@ class Filter:
                     
                     elapsed = time.time() - start_time
                     self._log(f"Total processing time: {elapsed:.1f}s, {len(all_images)} total images")
+                    # Final status update
+                    if all_images:
+                        self._update_user_progress(messages, f"✓ Ready! {len(all_images)} images processed in {elapsed:.1f}s")
 
                 # PDF processing
                 elif is_pdf:
