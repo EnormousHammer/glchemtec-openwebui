@@ -1988,7 +1988,7 @@ async def generate_report_docx(report: dict):
 
 async def _generate_ai_report_internal(conversation_history: list, format_type: str = "pdf", model: str = "gpt-4o") -> dict:
     """
-    Internal function to generate AI report using OpenAI Responses API.
+    Internal function to generate AI report using OpenAI Chat Completions API.
     Returns structured report dict.
     """
     if not conversation_history:
@@ -2028,33 +2028,73 @@ Guidelines:
 - Maintain technical accuracy
 - Return ONLY valid JSON, no markdown formatting or code blocks"""
     
-    # Add the system prompt as the first message
-    enhanced_history = [
-        {
-            "role": "system",
-            "content": [{"type": "input_text", "text": system_prompt}]
-        }
-    ] + conversation_history
+    # Convert conversation history to Chat Completions format
+    # The incoming format might be Responses API format, so we need to normalize it
+    chat_messages = [{"role": "system", "content": system_prompt}]
+    
+    for msg in conversation_history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        
+        # Handle different content formats
+        if isinstance(content, str):
+            text_content = content
+        elif isinstance(content, list):
+            # Extract text from list format (Responses API style)
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    # Handle {"type": "input_text", "text": "..."} or {"type": "text", "text": "..."}
+                    if item.get("type") in ["input_text", "text"]:
+                        text_parts.append(item.get("text", ""))
+                    elif item.get("type") == "image_url":
+                        text_parts.append("[Image]")
+                elif isinstance(item, str):
+                    text_parts.append(item)
+            text_content = "\n".join(text_parts)
+        else:
+            text_content = str(content)
+        
+        if text_content.strip():
+            chat_messages.append({"role": role, "content": text_content})
     
     # Add a final user message requesting the report
-    enhanced_history.append({
+    chat_messages.append({
         "role": "user",
-        "content": [{"type": "input_text", "text": f"Please create a professional {format_type.upper()} report from this conversation. Structure it clearly with sections, key findings, and actionable insights."}]
+        "content": f"Please create a professional {format_type.upper()} report from this conversation. Structure it clearly with sections, key findings, and actionable insights. Return ONLY the JSON object, no markdown."
     })
     
-    # Call OpenAI Responses API
-    response_data = await call_responses_api(model, enhanced_history)
+    log(f"Calling Chat Completions API with {len(chat_messages)} messages")
+    
+    # Use Chat Completions API (more reliable than Responses API for this use case)
+    import httpx
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not configured")
+    
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": chat_messages,
+                "temperature": 0.3,  # Lower temperature for more consistent JSON output
+                "max_tokens": 4000
+            }
+        )
+        response.raise_for_status()
+        result = response.json()
     
     # Extract the assistant's response
-    output = response_data.get("output", [])
-    if not output:
+    choices = result.get("choices", [])
+    if not choices:
         raise ValueError("No response from OpenAI")
     
-    # Get the text content from the response
-    ai_text = ""
-    for item in output:
-        if item.get("type") == "text":
-            ai_text += item.get("text", "")
+    ai_text = choices[0].get("message", {}).get("content", "")
     
     if not ai_text:
         raise ValueError("Empty response from OpenAI")
