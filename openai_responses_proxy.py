@@ -2072,22 +2072,36 @@ Guidelines:
     if not api_key:
         raise ValueError("OPENAI_API_KEY not configured")
     
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": model,
-                "messages": chat_messages,
-                "temperature": 0.3,  # Lower temperature for more consistent JSON output
-                "max_tokens": 4000
-            }
-        )
-        response.raise_for_status()
-        result = response.json()
+    try:
+        log(f"Making request to OpenAI API with model={model}, timeout=120s")
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{OPENAI_BASE_URL}/chat/completions",  # Use configured base URL
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model,
+                    "messages": chat_messages,
+                    "temperature": 0.3,  # Lower temperature for more consistent JSON output
+                    "max_tokens": 4000
+                }
+            )
+            log(f"OpenAI API response status: {response.status_code}")
+            if response.status_code != 200:
+                log(f"OpenAI API error response: {response.text[:500]}")
+            response.raise_for_status()
+            result = response.json()
+    except httpx.TimeoutException as e:
+        log(f"❌ OpenAI API timeout after 120s: {e}")
+        raise ValueError(f"OpenAI API timeout: {e}")
+    except httpx.HTTPStatusError as e:
+        log(f"❌ OpenAI API HTTP error: {e.response.status_code} - {e.response.text[:500]}")
+        raise ValueError(f"OpenAI API error: {e.response.status_code}")
+    except Exception as e:
+        log(f"❌ OpenAI API unexpected error: {type(e).__name__}: {e}")
+        raise
     
     # Extract the assistant's response
     choices = result.get("choices", [])
@@ -2186,62 +2200,23 @@ async def generate_ai_report(request: Request):
 async def create_export_file(request: Request):
     """
     Create an export file and return a download link.
-    Now supports both AI-generated reports and raw report structures.
-    Returns JSON with download_url that can be clicked directly.
+    Renders the conversation directly to PDF/Word - no separate AI calls.
+    The conversation is already formatted by whatever model the user is chatting with.
     """
     try:
         data = await request.json()
         report = data.get("report", {})
         format_type = data.get("format", "pdf").lower()
-        use_ai = data.get("use_ai", False)  # Default to False for backward compatibility
-        conversation = data.get("conversation", [])
-        model = data.get("model", "gpt-4o")
         
         # Log incoming request details
-        log(f"📥 Export create request: format={format_type}, use_ai={use_ai}, conversation_msgs={len(conversation)}")
-        log(f"   Raw report sections: {len(report.get('sections', []))}, title: {report.get('title', 'N/A')[:50]}")
+        log(f"📥 Export create request: format={format_type}")
+        log(f"   Report sections: {len(report.get('sections', []))}, title: {report.get('title', 'N/A')[:50]}")
         
-        # If use_ai is True and we have conversation history, generate AI report first
-        # Only use AI if explicitly requested AND conversation is provided
-        if use_ai and conversation and len(conversation) > 0:
-            try:
-                log(f"🤖 Generating AI report for {format_type} export with {len(conversation)} messages...")
-                ai_report = await _generate_ai_report_internal(conversation, format_type, model)
-                
-                # Validate AI report has required structure
-                if not isinstance(ai_report, dict) or "sections" not in ai_report:
-                    raise ValueError("AI report missing required structure")
-                
-                # Merge AI report with branding/metadata from original report
-                # Preserve branding info
-                if "company_name" in report:
-                    ai_report["company_name"] = report["company_name"]
-                if "logo_path" in report:
-                    ai_report["logo_path"] = report["logo_path"]
-                if "primary_color" in report:
-                    ai_report["primary_color"] = report["primary_color"]
-                if "secondary_color" in report:
-                    ai_report["secondary_color"] = report["secondary_color"]
-                if "document_type" in report:
-                    ai_report["document_type"] = report["document_type"]
-                # Add date/author if not present
-                if "date" not in ai_report:
-                    ai_report["date"] = report.get("date", "")
-                if "author" not in ai_report:
-                    ai_report["author"] = report.get("author", "")
-                report = ai_report
-                log(f"✅ Using AI-generated report with {len(report.get('sections', []))} sections")
-            except Exception as e:
-                log(f"❌ AI report generation failed, falling back to raw report: {e}")
-                import traceback
-                log(f"Traceback: {traceback.format_exc()}")
-                # Continue with raw report if AI fails - ensure report has minimum structure
-                if not report or not isinstance(report, dict):
-                    log(f"❌ No valid report structure to fall back to!")
-                    raise HTTPException(status_code=500, detail="Export failed: no valid report structure")
-                if "sections" not in report:
-                    report["sections"] = []
-                log(f"⚠️ Using raw report with {len(report.get('sections', []))} sections as fallback")
+        # Validate report structure
+        if not report or not isinstance(report, dict):
+            raise HTTPException(status_code=400, detail="No valid report structure provided")
+        if "sections" not in report:
+            report["sections"] = []
         
         # Log what we're about to render
         log(f"📄 Rendering {format_type.upper()} with {len(report.get('sections', []))} sections")

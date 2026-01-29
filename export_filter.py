@@ -108,12 +108,16 @@ class Filter:
                 print(f"[EXPORT-FILTER] CRITICAL: Cannot create Valves - {e2}")
                 # This should never happen, but if it does, we're in trouble
                 raise
-        # Patterns to detect export requests - more flexible patterns
+        # Patterns to detect export requests - more flexible patterns with typo tolerance
         self.export_patterns = [
-            # PDF patterns - more flexible
+            # PDF patterns - with typo tolerance for "export" (wxport, expotr, exprot, etc.)
+            r"[ewx]xport.*pdf",
+            r"exp[oar]rt.*pdf",
             r"export.*pdf",
             r"export.*to.*pdf",
             r"export.*as.*pdf",
+            r"[ewx]xport.*to.*pdf",
+            r"[ewx]xport.*as.*pdf",
             r"create.*pdf",
             r"make.*pdf",
             r"generate.*pdf",
@@ -123,13 +127,24 @@ class Filter:
             r"pdf.*export",
             r"pdf.*file",
             r"pdf.*document",
-            # Word/DOCX patterns - more flexible
+            r"convert.*pdf",
+            r"to\s+pdf",
+            r"as\s+pdf",
+            # Word/DOCX patterns - with typo tolerance
+            r"[ewx]xport.*word",
+            r"[ewx]xport.*docx",
+            r"exp[oar]rt.*word",
+            r"exp[oar]rt.*docx",
             r"export.*word",
             r"export.*docx",
             r"export.*to.*word",
             r"export.*to.*docx",
             r"export.*as.*word",
             r"export.*as.*docx",
+            r"[ewx]xport.*to.*word",
+            r"[ewx]xport.*to.*docx",
+            r"[ewx]xport.*as.*word",
+            r"[ewx]xport.*as.*docx",
             r"create.*word",
             r"create.*docx",
             r"make.*word",
@@ -144,6 +159,12 @@ class Filter:
             r"docx.*export",
             r"word.*file",
             r"docx.*file",
+            r"convert.*word",
+            r"convert.*docx",
+            r"to\s+word",
+            r"to\s+docx",
+            r"as\s+word",
+            r"as\s+docx",
         ]
 
     def _log(self, msg: str) -> None:
@@ -362,43 +383,13 @@ class Filter:
             url = f"{self.valves.export_service_url}/v1/export/create"
             self._log(f"Requesting export creation from: {url}")
             
+            # Just render the conversation directly - no separate AI call needed
+            # The conversation is already formatted by whatever model the user is chatting with
             payload = {
                 "report": report,
                 "format": format_type,
-                "use_ai": False,  # Default to False - only enable if messages provided
-                "model": "gpt-4o"  # Use gpt-4o for better quality
+                "use_ai": False  # Never use separate AI - just render the conversation as-is
             }
-            
-            # Include conversation history for AI generation
-            if messages and len(messages) > 0:
-                payload["use_ai"] = True  # Enable AI only if we have messages
-                # Convert messages to the format expected by OpenAI Responses API
-                conversation_history = []
-                for msg in messages:
-                    role = msg.get("role", "")
-                    content = msg.get("content", "")
-                    
-                    # Convert content to Responses API format
-                    if isinstance(content, str):
-                        content_items = [{"type": "input_text", "text": content}]
-                    elif isinstance(content, list):
-                        content_items = []
-                        for item in content:
-                            if isinstance(item, dict):
-                                # Already in Responses API format
-                                content_items.append(item)
-                            elif isinstance(item, str):
-                                content_items.append({"type": "input_text", "text": item})
-                    else:
-                        content_items = [{"type": "input_text", "text": str(content)}]
-                    
-                    conversation_history.append({
-                        "role": role,
-                        "content": content_items
-                    })
-                
-                payload["conversation"] = conversation_history
-                self._log(f"Including {len(conversation_history)} messages for AI generation")
             
             headers = {"Content-Type": "application/json"}
             response = requests.post(url, json=payload, headers=headers, timeout=120)  # Increased timeout for AI generation
@@ -614,6 +605,34 @@ class Filter:
             # Use data URL if available (works without route registration)
             final_url = data_url or download_url
             
+            # Generate unique ID for this download to prevent duplicate triggers
+            import hashlib
+            download_id = hashlib.md5(f"{filename}{file_size}".encode()).hexdigest()[:8]
+            js_safe_filename = filename.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
+            safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
+            branding = self._get_branding_config()
+            
+            # JavaScript to auto-trigger download - embedded in the response
+            auto_download_script = f'''
+<script>
+(function() {{
+    var downloadKey = 'glc_download_{download_id}';
+    if (sessionStorage.getItem(downloadKey)) return;
+    sessionStorage.setItem(downloadKey, 'true');
+    setTimeout(function() {{
+        var link = document.createElement('a');
+        link.href = '{final_url}';
+        link.download = '{js_safe_filename}';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('[GLChemTec Export] Auto-download triggered for: {js_safe_filename}');
+    }}, 500);
+}})();
+</script>
+'''
+            
             # Modify the user's message to include export instruction for the AI
             # This way the AI will respond with the download link naturally
             last_user_msg["content"] = (
@@ -621,9 +640,11 @@ class Filter:
                 f"[SYSTEM: Export has been created successfully. "
                 f"Respond with ONLY this exact message, nothing else:\n\n"
                 f"✅ **Export Ready!**\n\n"
-                f"📥 **Download:** [{filename}]({final_url})\n\n"
+                f"🎉 **Your download should start automatically!**\n\n"
+                f"If it doesn't, click the button below:\n\n"
+                f"<a href=\"{final_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0; font-size: 16px; cursor: pointer;\">📥 Download {safe_filename}</a>\n\n"
                 f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*\n\n"
-                f"Click the link above to download your file.]"
+                f"{auto_download_script}]"
             )
             
             self._log(f"✅ Modified user message with {'data URL' if data_url else 'download link'}")
@@ -726,13 +747,45 @@ class Filter:
                     # Use both formats for maximum compatibility
                     # Escape filename for HTML
                     safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
+                    js_safe_filename = filename.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
+                    
+                    # Generate unique ID for this download to prevent duplicate triggers
+                    import hashlib
+                    download_id = hashlib.md5(f"{filename}{file_size}".encode()).hexdigest()[:8]
+                    
+                    # JavaScript to auto-trigger download when rendered
+                    # Uses data URL which works reliably across browsers
+                    auto_download_script = f'''
+<script>
+(function() {{
+    // Only trigger once per download
+    var downloadKey = 'glc_download_{download_id}';
+    if (sessionStorage.getItem(downloadKey)) return;
+    sessionStorage.setItem(downloadKey, 'true');
+    
+    // Auto-trigger download after short delay
+    setTimeout(function() {{
+        var link = document.createElement('a');
+        link.href = '{download_url}';
+        link.download = '{js_safe_filename}';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('[GLChemTec Export] Auto-download triggered for: {js_safe_filename}');
+    }}, 500);
+}})();
+</script>
+'''
+                    
                     export_note = (
                         f"\n\n---\n"
                         f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
-                        f"**Download:** [{filename}]({download_url})\n\n"
-                        f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 8px 16px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 8px;\">📥 Download {safe_filename}</a>\n\n"
-                        f"*File size: {file_size_kb}KB | Generated by {branding['company_name']}*\n"
-                        f"*If the download doesn't start automatically, right-click the link above and select 'Save Link As'*"
+                        f"🎉 **Download should start automatically!**\n\n"
+                        f"If it doesn't, click the button below:\n\n"
+                        f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0; font-size: 16px; cursor: pointer;\">📥 Download {safe_filename}</a>\n\n"
+                        f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*\n\n"
+                        f"{auto_download_script}"
                     )
                     
                     # Modify assistant message content (like SharePoint filter does)
