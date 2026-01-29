@@ -1,8 +1,8 @@
 """
 title: Document Export Filter
 author: GLChemTec
-version: 1.0
-description: Detects export requests and generates Word/PDF files from conversation content.
+version: 1.1
+description: Detects export requests and generates Word/PDF files from conversation content. Fixed download links.
 """
 
 import os
@@ -566,27 +566,37 @@ class Filter:
             
             self._log(f"Export file created: {filename} ({file_size_kb}KB)")
             
-            # 4) Inject assistant reply WITH CLICKABLE LINK
-            body["messages"].append({
-                "role": "assistant",
-                "content": f"✅ Export ready:\n\n**Download:** [{filename}]({download_url})\n\n*File size: {file_size_kb}KB*"
-            })
+            # Store export info in metadata for outlet to use
+            if "metadata" not in body:
+                body["metadata"] = {}
+            body["metadata"]["export_file"] = {
+                "filename": filename,
+                "download_url": download_url,
+                "format": export_format,
+                "size": file_size
+            }
             
-            # 5) CRITICAL: Stop OpenWebUI from calling the model
-            body["max_tokens"] = 0
-            body["stream"] = False
+            # Modify the user's message to include export instruction for the AI
+            # This way the AI will respond with the download link naturally
+            last_user_msg["content"] = (
+                f"{user_content}\n\n"
+                f"[SYSTEM: Export has been created successfully. "
+                f"Respond with ONLY this message, nothing else:\n"
+                f"✅ **Export Ready!**\n\n"
+                f"📥 **Download:** [{filename}]({download_url})\n\n"
+                f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*\n\n"
+                f"Click the link above to download your file.]"
+            )
             
-            self._log(f"✅ Added assistant message with download link, prevented LLM call")
+            self._log(f"✅ Modified user message with export link, AI will respond with download")
         else:
-            # Return an assistant message anyway (no model call)
-            body["messages"].append({
-                "role": "assistant",
-                "content": "❌ Export failed (no URL returned). Check proxy logs: /v1/export/create"
-            })
-            # IMPORTANT: prevent the LLM call by forcing messages to end here
-            body["max_tokens"] = 0
-            body["stream"] = False
-            self._log("❌ Export creation failed, added error message")
+            # Modify user message to tell AI export failed
+            last_user_msg["content"] = (
+                f"{user_content}\n\n"
+                f"[SYSTEM: Export failed. Respond with: "
+                f"❌ Export failed. Please try again or contact support.]"
+            )
+            self._log("❌ Export creation failed, added error instruction")
 
         return body
 
