@@ -2157,11 +2157,15 @@ async def create_export_file(request: Request):
         conversation = data.get("conversation", [])
         model = data.get("model", "gpt-4o")
         
+        # Log incoming request details
+        log(f"📥 Export create request: format={format_type}, use_ai={use_ai}, conversation_msgs={len(conversation)}")
+        log(f"   Raw report sections: {len(report.get('sections', []))}, title: {report.get('title', 'N/A')[:50]}")
+        
         # If use_ai is True and we have conversation history, generate AI report first
         # Only use AI if explicitly requested AND conversation is provided
         if use_ai and conversation and len(conversation) > 0:
             try:
-                log(f"Generating AI report for {format_type} export...")
+                log(f"🤖 Generating AI report for {format_type} export with {len(conversation)} messages...")
                 ai_report = await _generate_ai_report_internal(conversation, format_type, model)
                 
                 # Validate AI report has required structure
@@ -2188,14 +2192,21 @@ async def create_export_file(request: Request):
                 report = ai_report
                 log(f"✅ Using AI-generated report with {len(report.get('sections', []))} sections")
             except Exception as e:
-                log(f"⚠️ AI report generation failed, falling back to raw report: {e}")
+                log(f"❌ AI report generation failed, falling back to raw report: {e}")
                 import traceback
                 log(f"Traceback: {traceback.format_exc()}")
                 # Continue with raw report if AI fails - ensure report has minimum structure
                 if not report or not isinstance(report, dict):
+                    log(f"❌ No valid report structure to fall back to!")
                     raise HTTPException(status_code=500, detail="Export failed: no valid report structure")
                 if "sections" not in report:
                     report["sections"] = []
+                log(f"⚠️ Using raw report with {len(report.get('sections', []))} sections as fallback")
+        
+        # Log what we're about to render
+        log(f"📄 Rendering {format_type.upper()} with {len(report.get('sections', []))} sections")
+        for i, sec in enumerate(report.get('sections', [])[:5]):  # Log first 5 sections
+            log(f"   Section {i+1}: '{sec.get('heading', 'N/A')[:40]}...' ({len(sec.get('body', ''))} chars)")
         
         if format_type == "pdf":
             file_bytes = render_report_pdf(report)
@@ -2207,6 +2218,8 @@ async def create_export_file(request: Request):
             ext = "docx"
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported format: {format_type}")
+        
+        log(f"✅ Generated {format_type.upper()}: {len(file_bytes)} bytes")
         
         # Validate file was actually created
         if not file_bytes or len(file_bytes) == 0:
