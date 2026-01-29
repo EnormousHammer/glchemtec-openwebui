@@ -1,153 +1,499 @@
+[notice] A new release of pip is available: 24.0 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+2026-01-25 21:18:29.671 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 127.0.0.1:42028 - "HEAD / HTTP/1.1" 200
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://glchemtec-openwebui.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
 [GET]
-glchemtec-openwebui.onrender.com/api/models? clientIP="143.105.15.243" requestID="e93c8d0a-f9e8-4967" responseTimeMS=657 responseBytes=1607 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/ clientIP="34.82.80.145" requestID="d21e77fb-7bf9-48cb" responseTimeMS=25 responseBytes=223158 userAgent="Go-http-client/2.0"
 [GET]
-glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="6d0b88d9-8013-41c5" responseTimeMS=7 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-[POST]
-glchemtec-openwebui.onrender.com/api/v1/files/?process=true clientIP="143.105.15.243" requestID="ac69f805-63ee-43fd" responseTimeMS=344 responseBytes=684 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/static/loader.js clientIP="143.105.15.243" requestID="c15a39d6-f2bc-49ab" responseTimeMS=161 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/files/cb553cce-314a-448c-9c23-89cfea3da521/process/status?stream=true clientIP="143.105.15.243" requestID="96f97bb4-4d2f-42dd" responseTimeMS=1012 responseBytes=243 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/static/custom.css clientIP="143.105.15.243" requestID="f698a32c-568c-4b10" responseTimeMS=10 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="143.105.15.243" requestID="e44029d8-6545-41fb" responseTimeMS=13 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-[POST]
-glchemtec-openwebui.onrender.com/api/v1/chats/new clientIP="143.105.15.243" requestID="6b433c1f-c544-4c44" responseTimeMS=12 responseBytes=1034 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/static/splash.png clientIP="143.105.15.243" requestID="51aeae28-56a0-4ff2" responseTimeMS=164 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="ef6ea75d-a478-4bb4" responseTimeMS=6 responseBytes=1213 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/api/config clientIP="143.105.15.243" requestID="d7294889-134d-43b4" responseTimeMS=167 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="d94e37a2-cff8-4c21" responseTimeMS=12 responseBytes=1213 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-2026-01-24 16:22:07.604 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-2026-01-24 16:22:07.604 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
+glchemtec-openwebui.onrender.com/static/splash-dark.png clientIP="143.105.15.243" requestID="8ea9d04c-d599-4d5f" responseTimeMS=166 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/favicon.png clientIP="143.105.15.243" requestID="a3cb0304-3b87-41e5" responseTimeMS=11 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/immutable/nodes/44.DHYxRvDO.js clientIP="143.105.15.243" requestID="b8f90d39-45e5-49ce" responseTimeMS=14 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="2b4a26b1-45c8-4dea" responseTimeMS=18 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="35c2bf38-6404-41ac" responseTimeMS=21 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/favicon.png clientIP="143.105.15.243" requestID="abcd40d3-ec8a-49e8" responseTimeMS=4 responseBytes=223158 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/splash-dark.png clientIP="143.105.15.243" requestID="0baeffad-8937-4b76" responseTimeMS=4 responseBytes=5711 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/config clientIP="143.105.15.243" requestID="6ae24406-331b-40fd" responseTimeMS=17 responseBytes=1557 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/splash.png clientIP="143.105.15.243" requestID="a155a782-81fc-46f5" responseTimeMS=5 responseBytes=5531 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/loader.js clientIP="143.105.15.243" requestID="8f25d34c-28c8-40cd" responseTimeMS=4 responseBytes=462 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/favicon.png clientIP="143.105.15.243" requestID="b7e264b2-6a87-4204" responseTimeMS=4 responseBytes=10948 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/static/custom.css clientIP="143.105.15.243" requestID="7c2c0ded-a28d-4ee1" responseTimeMS=5 responseBytes=455 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:08.314 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/custom.css HTTP/1.1" 200
+2026-01-25 21:19:08.322 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/loader.js HTTP/1.1" 200
+2026-01-25 21:19:08.326 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/splash.png HTTP/1.1" 200
+2026-01-25 21:19:08.468 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/splash-dark.png HTTP/1.1" 200
+2026-01-25 21:19:08.786 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/favicon.png HTTP/1.1" 200
+2026-01-25 21:19:08.804 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/config HTTP/1.1" 200
+2026-01-25 21:19:09.005 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/auths/ HTTP/1.1" 200
+2026-01-25 21:19:09.186 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/config HTTP/1.1" 200
+2026-01-25 21:19:09.189 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/user/settings HTTP/1.1" 200
+2026-01-25 21:19:09.835 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/configs/banners HTTP/1.1" 200
+2026-01-25 21:19:09.837 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/tools/ HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/auths/ clientIP="143.105.15.243" requestID="6c9e1d04-dcba-4348" responseTimeMS=10 responseBytes=1297 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/configs/banners clientIP="143.105.15.243" requestID="92e0f48f-4104-4869" responseTimeMS=455 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/folders/ clientIP="143.105.15.243" requestID="8470c2f4-f914-4231" responseTimeMS=438 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="143.105.15.243" requestID="6cd951e1-2455-41fb" responseTimeMS=469 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/user/settings clientIP="143.105.15.243" requestID="c72b4308-08cc-4851" responseTimeMS=454 responseBytes=3438 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/version clientIP="143.105.15.243" requestID="4b552162-ead5-412a" responseTimeMS=4 responseBytes=254 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/all/tags clientIP="143.105.15.243" requestID="b3e578b9-d4dc-452e" responseTimeMS=430 responseBytes=477 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/user/settings clientIP="143.105.15.243" requestID="2506d4dd-45c4-4a37" responseTimeMS=11 responseBytes=3438 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/2d462341-231d-4710-945f-af92b457e405/profile/image clientIP="143.105.15.243" requestID="0629a675-63f1-4241" responseTimeMS=424 responseBytes=8150 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/config clientIP="143.105.15.243" requestID="40400562-d4d4-4e55" responseTimeMS=10 responseBytes=1557 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:09.838 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/all/tags HTTP/1.1" 200
+2026-01-25 21:19:09.840 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/user/settings HTTP/1.1" 200
+2026-01-25 21:19:09.841 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/folders/ HTTP/1.1" 200
+2026-01-25 21:19:09.842 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/2d462341-231d-4710-945f-af92b457e405/profile/image HTTP/1.1" 200
+2026-01-25 21:19:09.973 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/version HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/pinned clientIP="143.105.15.243" requestID="753e2360-0970-409f" responseTimeMS=11 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:10.030 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/pinned HTTP/1.1" 200
+2026-01-25 21:19:10.082 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:274 - Installing requirements: pydantic>=2.0.0 aiohttp>=3.8.0
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pydantic>=2.0.0 in /usr/local/lib/python3.11/site-packages (2.12.5)
+Requirement already satisfied: aiohttp>=3.8.0 in /usr/local/lib/python3.11/site-packages (3.13.2)
+Requirement already satisfied: annotated-types>=0.6.0 in /usr/local/lib/python3.11/site-packages (from pydantic>=2.0.0) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in /usr/local/lib/python3.11/site-packages (from pydantic>=2.0.0) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in /usr/local/lib/python3.11/site-packages (from pydantic>=2.0.0) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in /usr/local/lib/python3.11/site-packages (from pydantic>=2.0.0) (0.4.2)
+Requirement already satisfied: aiohappyeyeballs>=2.5.0 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (2.6.1)
+Requirement already satisfied: aiosignal>=1.4.0 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (1.4.0)
+Requirement already satisfied: attrs>=17.3.0 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (25.4.0)
+Requirement already satisfied: frozenlist>=1.1.1 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (1.8.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (6.7.0)
+Requirement already satisfied: propcache>=0.2.0 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (0.4.1)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in /usr/local/lib/python3.11/site-packages (from aiohttp>=3.8.0) (1.22.0)
+Requirement already satisfied: idna>=2.0 in /usr/local/lib/python3.11/site-packages (from yarl<2.0,>=1.17.0->aiohttp>=3.8.0) (3.11)
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="346ab535-50dc-423c" responseTimeMS=2298 responseBytes=468 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[notice] A new release of pip is available: 24.0 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+2026-01-25 21:19:12.459 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_anthropic
+2026-01-25 21:19:12.462 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
+2026-01-25 21:19:12.462 | INFO     | open_webui.routers.ollama:get_all_models:331 - get_all_models()
 [PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-2026-01-24 16:22:07.614 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
-2026-01-24 16:22:07.619 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-25 21:19:12.481 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
+2026-01-25 21:19:12.486 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-25 21:19:12.490 | ERROR    | open_webui.routers.ollama:send_get_request:102 - Connection error: Cannot connect to host host.docker.internal:11434 ssl:default [Name or service not known]
+2026-01-25 21:19:12.853 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=2 HTTP/1.1" 200
 [PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:37478 - "GET /v1/models HTTP/1.1" 200 OK
-2026-01-24 16:22:08.251 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/models HTTP/1.1" 200
-2026-01-24 16:22:10.835 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/version.json HTTP/1.1" 200
-2026-01-24 16:22:12.161 | INFO     | open_webui.routers.files:upload_file_handler:225 - file.content_type: application/vnd.openxmlformats-officedocument.presentationml.presentation True
-2026-01-24 16:22:12.172 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/v1/files/?process=true HTTP/1.1" 200
-2026-01-24 16:22:12.305 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1425 - Using markdown header text splitter
-2026-01-24 16:22:12.323 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1509 - generating embeddings for file-cb553cce-314a-448c-9c23-89cfea3da521
-2026-01-24 16:22:12.337 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/files/cb553cce-314a-448c-9c23-89cfea3da521/process/status?stream=true HTTP/1.1" 200
-
-Batches:   0%|          | 0/5 [00:00<?, ?it/s]
-Batches:  20%|██        | 1/5 [00:00<00:00,  9.10it/s]
-Batches:  40%|████      | 2/5 [00:00<00:00,  9.19it/s]
-Batches:  60%|██████    | 3/5 [00:00<00:00,  9.36it/s]
-Batches:  80%|████████  | 4/5 [00:00<00:00,  9.40it/s]
-Batches: 100%|██████████| 5/5 [00:00<00:00,  9.51it/s]
-2026-01-24 16:22:12.853 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1549 - embeddings generated 5 for 5 items
-2026-01-24 16:22:12.854 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1561 - adding to collection file-cb553cce-314a-448c-9c23-89cfea3da521
-2026-01-24 16:22:12.948 | INFO     | open_webui.routers.retrieval:save_docs_to_vector_db:1567 - added 5 items to collection file-cb553cce-314a-448c-9c23-89cfea3da521
-2026-01-24 16:22:12.948 | INFO     | open_webui.routers.retrieval:process_file:1762 - added 1 items to collection file-cb553cce-314a-448c-9c23-89cfea3da521
-2026-01-24 16:22:13.949 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/tools/ HTTP/1.1" 200
-2026-01-24 16:22:14.066 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/v1/chats/new HTTP/1.1" 200
-2026-01-24 16:22:14.290 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-2026-01-24 16:22:14.490 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 HTTP/1.1" 200
-2026-01-24 16:22:14.681 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-[SHAREPOINT-IMPORT] Inlet called
-[SHAREPOINT-IMPORT] Filter disabled or SharePoint not enabled, skipping
-[EXPORT-FILTER] Inlet called
-[PPT-PDF-VISION] Converting PPTX->PDF: glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
-[PPT-PDF-VISION] Running LibreOffice PPTX->PDF: cb553cce-314a-448c-9c23-89cfea3da521_GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx
-[POST]
-glchemtec-openwebui.onrender.com/api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 clientIP="143.105.15.243" requestID="753088e5-e087-4fce" responseTimeMS=12 responseBytes=1141 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+INFO:     127.0.0.1:56756 - "GET /v1/models HTTP/1.1" 200 OK
+2026-01-25 21:19:13.179 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-25 21:19:13.184 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_sharepoint_integration
+[SHAREPOINT-IMPORT] SharePoint import filter initialized
 [GET]
-glchemtec-openwebui.onrender.com/ws/socket.io/?EIO=4&transport=websocket clientIP="143.105.15.243" requestID="" responseTimeMS=760008 responseBytes=0 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/api/v1/chats/?page=2 clientIP="143.105.15.243" requestID="51a562a7-4bf1-4466" responseTimeMS=6 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/ws/socket.io/?EIO=4&transport=websocket clientIP="143.105.15.243" requestID="" responseTimeMS=20718 responseBytes=145 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-[PPT-PDF-VISION] PDF->Images: dpi=300 max_pages=12 fmt=png
+glchemtec-openwebui.onrender.com/static/custom.css clientIP="143.105.15.243" requestID="ca97c817-d412-4976" responseTimeMS=3 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/ws/socket.io/?EIO=4&transport=websocket clientIP="143.105.15.243" requestID="" responseTimeMS=20721 responseBytes=145 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-[PPT-PDF-VISION] ✅ Rendered 12 images for glcrci-11062025r1 - progress update 05 - 11 dec 2025 - rev 1.pptx
-[PPT-PDF-VISION] ✅ Sending: text=1 blocks, images=12
-2026-01-24 16:23:50.422 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-2026-01-24 16:23:50.426 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/chat/completions HTTP/1.1" 200
-[PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-2026-01-24 16:23:50.435 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/version.json HTTP/1.1" 200
-2026-01-24 16:23:50.603 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-2026-01-24 16:23:50.722 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/version HTTP/1.1" 200
-[PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:49072 - "GET /v1/models HTTP/1.1" 200 OK
-[PROXY] [PROXY] POST /v1/chat/completions - model: gpt-5.2, messages: 2, stream: False
-[PROXY] Found 0 PDF(s), 0 image(s), 0 text block(s) (markers+uploads)
-[PROXY] Using standard Chat Completions API
-[POST]
-glchemtec-openwebui.onrender.com/api/chat/completions clientIP="143.105.15.243" requestID="4b7eea82-21fd-4696" responseTimeMS=95560 responseBytes=399 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Confetti.CzQ_D5bi.css clientIP="143.105.15.243" requestID="7b5e6c7f-9690-410c" responseTimeMS=5 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="1d485088-b76f-4ad0" responseTimeMS=38623 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/api/models? clientIP="143.105.15.243" requestID="7cf87c2c-a99f-4ab0" responseTimeMS=3274 responseBytes=1531 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="c0c4159f-94ce-4e18" responseTimeMS=9 responseBytes=1213 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/ConfirmDialog.DaQE45yT.css clientIP="143.105.15.243" requestID="5d61d678-349a-4385" responseTimeMS=6 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/version clientIP="143.105.15.243" requestID="80120647-6ccb-486d" responseTimeMS=3 responseBytes=254 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-INFO:     127.0.0.1:49076 - "POST /v1/chat/completions HTTP/1.1" 200 OK
-
-Batches:   0%|          | 0/3 [00:00<?, ?it/s]
-Batches: 100%|██████████| 3/3 [00:00<00:00, 28.85it/s]
-Batches: 100%|██████████| 3/3 [00:00<00:00, 28.79it/s]
-2026-01-24 16:23:53.844 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['19666cda-0808-458d-b803-2435e2945e57', 'e8a11a5a-ed5b-44ba-8800-8a37eff6983e', '187778bd-37e4-4712-867d-4fb52d8cb8b7']] [[{'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 2514, 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405'}, {'created_by': '2d462341-231d-4710-945f-af92b457e405', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 0, 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7'}, {'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 681, 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}"}]]
-2026-01-24 16:23:53.845 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['19666cda-0808-458d-b803-2435e2945e57', '187778bd-37e4-4712-867d-4fb52d8cb8b7', '8e828371-e7b1-43aa-8ee4-32e414e9b10e']] [[{'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'start_index': 2514}, {'start_index': 681, 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521'}, {'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'start_index': 3260}]]
-2026-01-24 16:23:53.846 | INFO     | open_webui.retrieval.utils:query_doc:150 - query_doc:result [['187778bd-37e4-4712-867d-4fb52d8cb8b7', 'e8a11a5a-ed5b-44ba-8800-8a37eff6983e', '19666cda-0808-458d-b803-2435e2945e57']] [[{'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'start_index': 681, 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'start_index': 0}, {'source': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx', 'hash': '5c537a4e9c133b3397b7f8834afe9d74e808b4cde4d840c56bedd062f195e0b7', 'start_index': 2514, 'file_id': 'cb553cce-314a-448c-9c23-89cfea3da521', 'embedding_config': "{'engine': '', 'model': 'sentence-transformers/all-MiniLM-L6-v2'}", 'created_by': '2d462341-231d-4710-945f-af92b457e405', 'name': 'GLCRCI-11062025R1 - Progress Update 05 - 11 Dec 2025 - rev 1.pptx'}]]
-2026-01-24 16:23:53.885 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-[PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-[PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:33012 - "GET /v1/models HTTP/1.1" 200 OK
-[PROXY] [PROXY] POST /v1/chat/completions - model: gpt-5.2, messages: 2, stream: True
-[PROXY] Found 0 PDF(s), 12 image(s), 0 text block(s) (markers+uploads)
-[PROXY] 📊 Added NMR analysis instructions - 12 images will be analyzed
-[PROXY] Using fast Chat Completions API with vision support for 12 images
-INFO:     127.0.0.1:33022 - "POST /v1/chat/completions HTTP/1.1" 200 OK
-[POST]
-glchemtec-openwebui.onrender.com/api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 clientIP="143.105.15.243" requestID="a030dcac-0224-40e5" responseTimeMS=29 responseBytes=4740 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-[POST]
-glchemtec-openwebui.onrender.com/api/chat/completed clientIP="143.105.15.243" requestID="79e0df92-2ef1-4e58" responseTimeMS=30 responseBytes=4237 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/FileItem.CNBty9SB.css clientIP="143.105.15.243" requestID="18b5c782-ebc1-497c" responseTimeMS=4 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="5c853aea-1a42-4f87" responseTimeMS=9 responseBytes=1213 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-2026-01-24 16:24:38.810 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-[PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-[EXPORT-FILTER] Outlet called
-2026-01-24 16:24:39.285 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/chat/completed HTTP/1.1" 200
-2026-01-24 16:24:39.470 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "POST /api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 HTTP/1.1" 200
-[PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:37078 - "GET /v1/models HTTP/1.1" 200 OK
-[PROXY] [PROXY] POST /v1/chat/completions - model: gpt-5.2, messages: 2, stream: False
-[PROXY] Found 0 PDF(s), 0 image(s), 0 text block(s) (markers+uploads)
-[PROXY] Using standard Chat Completions API
-2026-01-24 16:24:39.646 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-INFO:     127.0.0.1:37080 - "POST /v1/chat/completions HTTP/1.1" 200 OK
-2026-01-24 16:24:45.774 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-[PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-[PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:38762 - "GET /v1/models HTTP/1.1" 200 OK
-[PROXY] [PROXY] POST /v1/chat/completions - model: gpt-5.2, messages: 2, stream: False
-[PROXY] Found 0 PDF(s), 0 image(s), 0 text block(s) (markers+uploads)
-[PROXY] Using standard Chat Completions API
-INFO:     127.0.0.1:38778 - "POST /v1/chat/completions HTTP/1.1" 200 OK
-2026-01-24 16:24:48.123 | INFO     | open_webui.routers.openai:get_all_models:477 - get_all_models()
-[PROXY] GET /v1/models - OpenWebUI is calling the proxy!
-2026-01-24 16:24:48.277 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-2026-01-24 16:24:48.437 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/?page=1 HTTP/1.1" 200
-[PROXY] GET /v1/models - Success! Returning 112 models
-INFO:     127.0.0.1:38792 - "GET /v1/models HTTP/1.1" 200 OK
-[PROXY] [PROXY] POST /v1/chat/completions - model: gpt-5.2, messages: 2, stream: False
-[PROXY] Found 0 PDF(s), 0 image(s), 0 text block(s) (markers+uploads)
-[PROXY] Using standard Chat Completions API
-2026-01-24 16:24:48.823 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/version.json HTTP/1.1" 200
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Chat.Dkpsp2iL.css clientIP="143.105.15.243" requestID="b44a4b0c-ce2f-497e" responseTimeMS=4 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="145bc5a4-11d0-4eab" responseTimeMS=8 responseBytes=1221 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Toaster.DKF17Rty.css clientIP="143.105.15.243" requestID="d0b3ecbd-7ad1-4160" responseTimeMS=6 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/?page=1 clientIP="143.105.15.243" requestID="24731103-1579-41ba" responseTimeMS=9 responseBytes=1221 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/UserMenu.X_EDr3Bi.css clientIP="143.105.15.243" requestID="1ed305d7-4e4b-4aad" responseTimeMS=6 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="8cb39f48-b8de-4aae" responseTimeMS=12 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-INFO:     127.0.0.1:38794 - "POST /v1/chat/completions HTTP/1.1" 200 OK
-2026-01-24 16:24:50.727 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 HTTP/1.1" 200
-2026-01-24 16:24:50.735 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/all/tags HTTP/1.1" 200
-2026-01-24 16:24:50.888 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/all/tags HTTP/1.1" 200
+glchemtec-openwebui.onrender.com/_app/immutable/assets/28.tn0RQdqM.css clientIP="143.105.15.243" requestID="09d8b06c-eeda-4b0f" responseTimeMS=5 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/all/tags clientIP="143.105.15.243" requestID="4a8b6aa0-5c06-414a" responseTimeMS=7 responseBytes=618 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Messages.BPOsJAE0.css clientIP="143.105.15.243" requestID="fe3531e9-7139-4fdf" responseTimeMS=6 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/2fe55d0b-7636-46bf-a5f3-31972a69d2b0 clientIP="143.105.15.243" requestID="383fa447-87b4-4734" responseTimeMS=8 responseBytes=5060 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/0.BkTPzmEp.css clientIP="143.105.15.243" requestID="9bb7c4f3-534c-4502" responseTimeMS=4 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/api/v1/chats/all/tags clientIP="143.105.15.243" requestID="0f5c81a0-3785-428c" responseTimeMS=7 responseBytes=618 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+glchemtec-openwebui.onrender.com/_app/immutable/assets/2.BpqbiIOH.css clientIP="143.105.15.243" requestID="2102b5c5-19ed-4acf" responseTimeMS=2 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 [GET]
-glchemtec-openwebui.onrender.com/_app/version.json clientIP="143.105.15.243" requestID="6aad3cd4-a16b-41d3" responseTimeMS=9 responseBytes=371 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-2026-01-24 16:26:09.054 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/version.json HTTP/1.1" 200
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Skeleton.D68k68zP.css clientIP="143.105.15.243" requestID="bfa1d8a6-4ac4-487c" responseTimeMS=2 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Drawer.BBo9ZRVf.css clientIP="143.105.15.243" requestID="a40ce1fc-062c-43e7" responseTimeMS=5 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[SHAREPOINT-IMPORT] Site URL: https://glchemtecint.sharepoint.com/
+[SHAREPOINT-IMPORT] SharePoint enabled: True
+2026-01-25 21:19:13.185 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-25 21:19:13.189 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_export_to_word_or_pdf
+[PROXY] HEALTH CHECK: Proxy is alive and responding!
+INFO:     127.0.0.1:56770 - "GET /health HTTP/1.1" 200 OK
+[EXPORT-FILTER] Export filter initialized - proxy reachable at http://127.0.0.1:8000
+[EXPORT-FILTER] Export filter initialized (public_url: https://glchemtec-openwebui.onrender.com)
+2026-01-25 21:19:13.193 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-25 21:19:13.328 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_ppt_to_pdf_vision_filter
+2026-01-25 21:19:13.330 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-25 21:19:13.333 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_pubchem_look_up
+2026-01-25 21:19:13.335 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:286 - No requirements found in frontmatter.
+2026-01-25 21:19:13.340 | INFO     | open_webui.utils.plugin:load_function_module_by_id:146 - Loaded module: function_documnet_filter
+2026-01-25 21:19:13.347 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/models HTTP/1.1" 200
+2026-01-25 21:19:13.456 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/custom.css HTTP/1.1" 304
+2026-01-25 21:19:13.465 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/28.tn0RQdqM.css HTTP/1.1" 304
+2026-01-25 21:19:13.466 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Messages.BPOsJAE0.css HTTP/1.1" 304
+2026-01-25 21:19:13.467 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/UserMenu.X_EDr3Bi.css HTTP/1.1" 304
+2026-01-25 21:19:13.475 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Collapsible.BSTcku12.css HTTP/1.1" 304
+2026-01-25 21:19:13.478 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/ConfirmDialog.DaQE45yT.css HTTP/1.1" 304
+2026-01-25 21:19:13.479 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/0.BkTPzmEp.css HTTP/1.1" 304
+2026-01-25 21:19:13.480 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/RichTextInput.D0CG4PmL.css HTTP/1.1" 304
+2026-01-25 21:19:13.486 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /manifest.json HTTP/1.1" 200
+2026-01-25 21:19:13.488 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Chat.Dkpsp2iL.css HTTP/1.1" 304
+2026-01-25 21:19:13.499 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Skeleton.D68k68zP.css HTTP/1.1" 304
+2026-01-25 21:19:13.505 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/2.BpqbiIOH.css HTTP/1.1" 304
+2026-01-25 21:19:13.630 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Toaster.DKF17Rty.css HTTP/1.1" 304
+2026-01-25 21:19:13.641 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Drawer.BBo9ZRVf.css HTTP/1.1" 304
+2026-01-25 21:19:13.645 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Modal.CSlFhZkq.css HTTP/1.1" 304
+2026-01-25 21:19:13.661 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/FileItem.CNBty9SB.css HTTP/1.1" 304
+2026-01-25 21:19:13.666 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /_app/immutable/assets/Confetti.CzQ_D5bi.css HTTP/1.1" 304
+2026-01-25 21:19:13.881 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/version/updates HTTP/1.1" 200
+2026-01-25 21:19:14.102 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/tools/ HTTP/1.1" 200
+2026-01-25 21:19:14.113 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/models/model/profile/image?id=undefined&lang=en-US HTTP/1.1" 401
+[GET]
+glchemtec-openwebui.onrender.com/api/version/updates clientIP="143.105.15.243" requestID="7415cd8e-dcbf-4f35" responseTimeMS=60 responseBytes=247 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Modal.CSlFhZkq.css clientIP="143.105.15.243" requestID="624a12df-883c-4b99" responseTimeMS=3 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/manifest.json clientIP="143.105.15.243" requestID="a01e5ae1-8fba-4a8f" responseTimeMS=3 responseBytes=530 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/immutable/assets/Collapsible.BSTcku12.css clientIP="143.105.15.243" requestID="28464754-d4f0-4dc3" responseTimeMS=3 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/_app/immutable/assets/RichTextInput.D0CG4PmL.css clientIP="143.105.15.243" requestID="6f7e5f63-c3bd-4fd7" responseTimeMS=2 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/models/model/profile/image?id=undefined&lang=en-US clientIP="143.105.15.243" requestID="08efdd92-d975-489f" responseTimeMS=11 responseBytes=287 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/ clientIP="143.105.15.243" requestID="64b20163-d9db-48f9" responseTimeMS=9 responseBytes=287 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/ clientIP="143.105.15.243" requestID="49b4aaa9-9d5b-4b43" responseTimeMS=15 responseBytes=2202 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/models/model/profile/image?id=gl---ai-agent-prompt-v1&lang=en-US clientIP="143.105.15.243" requestID="f74dfa5b-d433-40c3" responseTimeMS=23 responseBytes=10948 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/tools/ clientIP="143.105.15.243" requestID="70237817-6537-45f2" responseTimeMS=10 responseBytes=218 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:14.113 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/functions/ HTTP/1.1" 401
+2026-01-25 21:19:14.115 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/models/model/profile/image?id=gl---ai-agent-prompt-v1&lang=en-US HTTP/1.1" 200
+2026-01-25 21:19:14.303 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/functions/ HTTP/1.1" 200
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/198838cd-b2e1-4d0a-ba5e-22a9f15c94a3 clientIP="143.105.15.243" requestID="45dad310-7f0d-49be" responseTimeMS=20 responseBytes=5009 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/chats/d6d5bde2-0da8-4636-a13f-6b7505799a23 clientIP="143.105.15.243" requestID="777fc471-3e8e-477e" responseTimeMS=17 responseBytes=263 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:21.353 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/198838cd-b2e1-4d0a-ba5e-22a9f15c94a3 HTTP/1.1" 200
+2026-01-25 21:19:21.357 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/chats/d6d5bde2-0da8-4636-a13f-6b7505799a23 HTTP/1.1" 401
+[GET]
+glchemtec-openwebui.onrender.com/api/usage clientIP="143.105.15.243" requestID="8217f753-cfe5-4429" responseTimeMS=13 responseBytes=247 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:22.093 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/usage HTTP/1.1" 200
+2026-01-25 21:19:24.922 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /static/favicon.png HTTP/1.1" 304
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/75edf9a5-c088-40ce-a214-5d9df1ad7694 clientIP="143.105.15.243" requestID="36dbc1ae-9925-4390" responseTimeMS=11 responseBytes=605 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/2d462341-231d-4710-945f-af92b457e405 clientIP="143.105.15.243" requestID="d92f303d-a4e5-47e7" responseTimeMS=11 responseBytes=3787 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/?page=1&order_by=created_at&direction=asc clientIP="143.105.15.243" requestID="04a004df-d4ff-4fb1" responseTimeMS=13 responseBytes=3942 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+2026-01-25 21:19:25.075 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/?page=1&order_by=created_at&direction=asc HTTP/1.1" 200
+2026-01-25 21:19:25.281 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/75edf9a5-c088-40ce-a214-5d9df1ad7694/profile/image HTTP/1.1" 200
+2026-01-25 21:19:25.310 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/75edf9a5-c088-40ce-a214-5d9df1ad7694 HTTP/1.1" 200
+2026-01-25 21:19:25.314 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/users/2d462341-231d-4710-945f-af92b457e405 HTTP/1.1" 200
+2026-01-25 21:19:25.913 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/functions/list HTTP/1.1" 500
+Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 913, in __connect
+    )._exec_w_sync_on_first_run(self.dbapi_connection, self)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/event/attr.py", line 507, in _exec_w_sync_on_first_run
+    self(*args, **kw)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/event/attr.py", line 515, in __call__
+    fn(*args, **kw)
+  File "/app/backend/open_webui/internal/db.py", line 123, in on_connect
+    cursor.execute("PRAGMA journal_mode=DELETE")
+sqlite3.OperationalError: database is locked
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/fastapi/applications.py", line 1135, in __call__
+    await super().__call__(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/sessions.py", line 85, in __call__
+    await self.app(scope, receive, send_wrapper)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/main.py", line 1392, in inspect_websocket
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/main.py", line 1371, in check_url
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/main.py", line 1357, in commit_session_after_request
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/main.py", line 1348, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/utils/security_headers.py", line 11, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/main.py", line 1304, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/usr/local/lib/python3.11/site-packages/starlette_compress/__init__.py", line 94, in __call__
+    return await self._brotli(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/starlette_compress/_brotli.py", line 106, in __call__
+    await self.app(scope, receive, wrapper)
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/usr/local/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 115, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 101, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 355, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 243, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/routers/functions.py", line 53, in get_function_list
+    return Functions.get_function_list(db=db)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/models/functions.py", line 225, in get_function_list
+    users = Users.get_users_by_user_ids(user_ids, db=db) if user_ids else []
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/open_webui/models/users.py", line 482, in get_users_by_user_ids
+    users = db.query(User).filter(User.id.in_(user_ids)).all()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+[GET]
+glchemtec-openwebui.onrender.com/static/favicon.png clientIP="143.105.15.243" requestID="c14dea77-d597-43f9" responseTimeMS=6 responseBytes=177 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/users/75edf9a5-c088-40ce-a214-5d9df1ad7694/profile/image clientIP="143.105.15.243" requestID="7d4071a6-097b-45f7" responseTimeMS=9 responseBytes=8150 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/list clientIP="143.105.15.243" requestID="14c73b72-adaa-4827" responseTimeMS=22 responseBytes=227 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+[GET]
+glchemtec-openwebui.onrender.com/api/v1/functions/ clientIP="143.105.15.243" requestID="1878b8d3-572e-4a04" responseTimeMS=23 responseBytes=2202 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3285, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3309, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 913, in __connect
+    )._exec_w_sync_on_first_run(self.dbapi_connection, self)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/event/attr.py", line 507, in _exec_w_sync_on_first_run
+    self(*args, **kw)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/event/attr.py", line 515, in __call__
+    fn(*args, **kw)
+  File "/app/backend/open_webui/internal/db.py", line 123, in on_connect
+    cursor.execute("PRAGMA journal_mode=DELETE")
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-01-25 21:19:25.925 | INFO     | uvicorn.protocols.http.httptools_impl:send:483 - 143.105.15.243:0 - "GET /api/v1/functions/ HTTP/1.1" 200

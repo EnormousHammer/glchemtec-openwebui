@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 9.0
-description: Local PPTX extraction (no external service needed) + vision processing for PDFs.
+version: 9.2
+description: Local PPTX extraction + vision processing. Fixed table crash. Optimized for NMR spectra quality.
 """
 
 import os
@@ -34,13 +34,13 @@ class Filter:
         # PPTX Extraction - Built into OpenWebUI instance (no external service needed)
         # The extraction now happens directly in this filter using python-pptx
         
-        # PDF Processing (fallback for PDFs)
-        max_pages: int = Field(default=8, description="Max pages for PDF processing")
-        dpi: int = Field(default=150, description="DPI for PDF rendering (higher = clearer text)")
-        max_image_width: int = Field(default=1600, description="Max width in pixels (larger = more detail)")
-        max_image_height: int = Field(default=1200, description="Max height in pixels (larger = more content)")
-        jpeg_quality: int = Field(default=85, description="JPEG quality (0-100, higher = less compression)")
-        max_total_base64_mb: float = Field(default=5.0, description="Max total base64 size in MB")
+        # PDF Processing (optimized for NMR spectra quality)
+        max_pages: int = Field(default=10, description="Max pages for PDF processing")
+        dpi: int = Field(default=200, description="DPI for PDF rendering (200 = excellent for NMR peak labels)")
+        max_image_width: int = Field(default=2000, description="Max width in pixels (larger = more detail for NMR)")
+        max_image_height: int = Field(default=1500, description="Max height in pixels (larger = more content)")
+        jpeg_quality: int = Field(default=92, description="JPEG quality (92 = high quality for NMR spectra)")
+        max_total_base64_mb: float = Field(default=15.0, description="Max total base64 size in MB - increased for NMR")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -210,7 +210,9 @@ class Filter:
                             self._log(f"Error extracting image from slide {slide_idx}: {e}")
                     
                     # Tables
-                    if hasattr(shape, "table") and shape.has_table:
+                    # IMPORTANT: Must use has_table property, not hasattr(shape, "table")
+                    # hasattr returns True for GraphicFrame shapes (charts, etc.) but accessing .table crashes
+                    if getattr(shape, "has_table", False):
                         try:
                             table = shape.table
                             table_data = {
@@ -426,7 +428,9 @@ class Filter:
                     self._log(f"Slide {slide_num}: Error extracting from text_frame: {e}")
             
             # Method 3: Extract from table cells
-            if hasattr(shape, "table"):
+            # IMPORTANT: Must use has_table property, not hasattr(shape, "table")
+            # hasattr returns True for GraphicFrame shapes (charts, etc.) but accessing .table crashes
+            if getattr(shape, "has_table", False):
                 try:
                     table = shape.table
                     table_rows = []
@@ -551,7 +555,9 @@ class Filter:
                 
                 # Also extract tables separately for better formatting
                 for shape in slide.shapes:
-                    if hasattr(shape, "table"):
+                    # IMPORTANT: Must use has_table property, not hasattr(shape, "table")
+                    # hasattr returns True for GraphicFrame shapes (charts, etc.) but accessing .table crashes
+                    if getattr(shape, "has_table", False):
                         try:
                             table = shape.table
                             table_data = []

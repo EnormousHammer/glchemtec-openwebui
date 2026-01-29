@@ -32,7 +32,7 @@ If you're getting `{"detail": "Not Found"}`, it means:
    Starting OpenWebUI...
    INFO:     Started server process [X]
    INFO:     Waiting for application startup.
-   INFO:     Application startup complete.
+   INFO:     Application startup\ complete.
    INFO:     Uvicorn running on http://0.0.0.0:XXXX
    ```
 

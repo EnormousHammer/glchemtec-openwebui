@@ -1,8 +1,8 @@
 """
 title: PPT/PDF Vision Filter
 author: GLChemTec
-version: 11.0
-description: Processes PPT/PPTX/PDF files for vision analysis. Only processes files in the CURRENT message - ignores conversation history.
+version: 11.1
+description: Processes PPT/PPTX/PDF files for vision analysis. Optimized for NMR spectra quality. Only processes files in the CURRENT message.
 """
 
 import os
@@ -31,14 +31,14 @@ class Filter:
         enabled: bool = Field(default=True, description="Enable PPT/PDF vision processing")
         debug: bool = Field(default=True, description="Enable debug logging")
 
-        # Rendering quality (optimized for chemistry PPTs with EMF/WMF graphics)
-        dpi: int = Field(default=150, description="DPI for PDF rendering (150 = good quality, faster for chemistry PPTs)")
+        # Rendering quality (optimized for NMR spectra and chemistry PPTs)
+        dpi: int = Field(default=200, description="DPI for PDF rendering (200 = excellent for NMR peak labels)")
         max_pages: int = Field(default=10, description="Max pages/slides to render (optimized for chemistry PPTs)")
-        output_format: str = Field(default="jpeg", description="png or jpeg (jpeg uses less memory)")
-        jpeg_quality: int = Field(default=80, description="JPEG quality if using jpeg (80-85 recommended)")
+        output_format: str = Field(default="png", description="png for lossless quality (best for NMR spectra)")
+        jpeg_quality: int = Field(default=92, description="JPEG quality if using jpeg (92 = high quality for spectra)")
 
-        # Size limits (optimized for chemistry PPTs)
-        max_total_image_mb: float = Field(default=25.0, description="Max total image payload (MB)")
+        # Size limits (increased for high-quality NMR spectra)
+        max_total_image_mb: float = Field(default=40.0, description="Max total image payload (MB) - increased for NMR quality")
         
         # Timeouts (optimized for chemistry PPTs with EMF/WMF graphics and heavy tables)
         libreoffice_base_timeout: int = Field(default=120, description="Base LibreOffice timeout (sec) - increased for chemistry PPTs")
@@ -590,13 +590,13 @@ class Filter:
     # IMAGE UTILITIES
     # =========================================================================
 
-    def _to_data_url(self, img_path: str, max_size_mb: float = 1.5) -> Optional[str]:
-        """Convert image file to base64 data URL. Memory-efficient with size limits."""
+    def _to_data_url(self, img_path: str, max_size_mb: float = 3.0) -> Optional[str]:
+        """Convert image file to base64 data URL. Optimized for NMR spectra quality."""
         try:
             if not os.path.exists(img_path):
                 return None
             
-            # Check file size - skip if too large (reduced to 1.5MB for memory efficiency)
+            # Check file size - increased limit for NMR spectra quality
             size_mb = os.path.getsize(img_path) / (1024 * 1024)
             if size_mb > max_size_mb:
                 self._log(f"Skipping large image: {size_mb:.1f}MB (limit: {max_size_mb}MB)")
@@ -800,7 +800,7 @@ class Filter:
                                             self._log(f"Stopping image encoding - {int(self.valves.max_processing_time - elapsed)}s before timeout")
                                             break
                                     
-                                    url = self._to_data_url(p, max_size_mb=1.5)  # Reduced to 1.5MB per image for memory
+                                    url = self._to_data_url(p, max_size_mb=3.0)  # Increased for NMR spectra quality
                                     if url:
                                         all_images.append({"type": "image_url", "image_url": {"url": url}})
                                         encoded_count += 1
@@ -878,7 +878,7 @@ class Filter:
                                     self._log(f"Stopping embedded image extraction - {int(self.valves.max_processing_time - elapsed)}s before timeout")
                                     break
                             
-                            url = self._to_data_url(p, max_size_mb=1.5)  # Reduced to 1.5MB per image for memory
+                            url = self._to_data_url(p, max_size_mb=3.0)  # Increased for NMR spectra quality
                             if url:
                                 all_images.append({"type": "image_url", "image_url": {"url": url}})
                                 encoded_embedded += 1
