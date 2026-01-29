@@ -1,8 +1,8 @@
 """
 title: Document Export Filter
 author: GLChemTec
-version: 1.2
-description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads.
+version: 1.3
+description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads. Enhanced logging.
 """
 
 import os
@@ -290,6 +290,13 @@ class Filter:
                 sections_added += 1
 
         self._log(f"Report built: {sections_added} sections, {total_content_chars} total characters")
+        
+        # Log section details for debugging
+        for i, sec in enumerate(report.get("sections", [])):
+            heading = sec.get("heading", "")[:50]
+            body_len = len(sec.get("body", ""))
+            self._log(f"  Section {i+1}: '{heading}...' ({body_len} chars)")
+        
         if sections_added == 0:
             self._log(f"WARNING: No sections added to report! Messages: {len(messages)}")
             # Add at least something so PDF isn't empty
@@ -568,20 +575,29 @@ class Filter:
             
             # Try to get the file bytes directly and create a data URL
             data_url = None
+            file_id = export_result.get('file_id', '')
             try:
                 # Fetch the file directly from proxy
-                file_response = requests.get(
-                    f"{self.valves.export_service_url}/v1/export/download/{export_result.get('file_id', '')}",
-                    timeout=30
-                )
+                download_endpoint = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
+                self._log(f"Fetching file from: {download_endpoint}")
+                file_response = requests.get(download_endpoint, timeout=30)
+                self._log(f"Download response: {file_response.status_code}, size: {len(file_response.content)} bytes")
+                
                 if file_response.status_code == 200:
                     file_bytes = file_response.content
-                    b64_data = base64.b64encode(file_bytes).decode('utf-8')
-                    mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    data_url = f"data:{mime_type};base64,{b64_data}"
-                    self._log(f"✅ Created data URL for direct download ({len(b64_data)//1024}KB)")
+                    if len(file_bytes) > 0:
+                        b64_data = base64.b64encode(file_bytes).decode('utf-8')
+                        mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        data_url = f"data:{mime_type};base64,{b64_data}"
+                        self._log(f"✅ Created data URL for direct download ({len(file_bytes)//1024}KB file, {len(b64_data)//1024}KB base64)")
+                    else:
+                        self._log(f"⚠️ Downloaded file is empty!")
+                else:
+                    self._log(f"⚠️ Download failed: HTTP {file_response.status_code} - {file_response.text[:200]}")
             except Exception as e:
                 self._log(f"⚠️ Could not create data URL: {e}")
+                import traceback
+                self._log(f"Traceback: {traceback.format_exc()}")
             
             # Store export info in metadata for outlet to use
             if "metadata" not in body:
