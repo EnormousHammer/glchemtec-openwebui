@@ -1,8 +1,8 @@
 """
 title: Document Export Filter
 author: GLChemTec
-version: 1.1
-description: Detects export requests and generates Word/PDF files from conversation content. Fixed download links.
+version: 1.2
+description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads.
 """
 
 import os
@@ -566,29 +566,50 @@ class Filter:
             
             self._log(f"Export file created: {filename} ({file_size_kb}KB)")
             
+            # Try to get the file bytes directly and create a data URL
+            data_url = None
+            try:
+                # Fetch the file directly from proxy
+                file_response = requests.get(
+                    f"{self.valves.export_service_url}/v1/export/download/{export_result.get('file_id', '')}",
+                    timeout=30
+                )
+                if file_response.status_code == 200:
+                    file_bytes = file_response.content
+                    b64_data = base64.b64encode(file_bytes).decode('utf-8')
+                    mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    data_url = f"data:{mime_type};base64,{b64_data}"
+                    self._log(f"✅ Created data URL for direct download ({len(b64_data)//1024}KB)")
+            except Exception as e:
+                self._log(f"⚠️ Could not create data URL: {e}")
+            
             # Store export info in metadata for outlet to use
             if "metadata" not in body:
                 body["metadata"] = {}
             body["metadata"]["export_file"] = {
                 "filename": filename,
-                "download_url": download_url,
+                "download_url": data_url or download_url,
                 "format": export_format,
-                "size": file_size
+                "size": file_size,
+                "is_data_url": data_url is not None
             }
+            
+            # Use data URL if available (works without route registration)
+            final_url = data_url or download_url
             
             # Modify the user's message to include export instruction for the AI
             # This way the AI will respond with the download link naturally
             last_user_msg["content"] = (
                 f"{user_content}\n\n"
                 f"[SYSTEM: Export has been created successfully. "
-                f"Respond with ONLY this message, nothing else:\n"
+                f"Respond with ONLY this exact message, nothing else:\n\n"
                 f"✅ **Export Ready!**\n\n"
-                f"📥 **Download:** [{filename}]({download_url})\n\n"
+                f"📥 **Download:** [{filename}]({final_url})\n\n"
                 f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*\n\n"
                 f"Click the link above to download your file.]"
             )
             
-            self._log(f"✅ Modified user message with export link, AI will respond with download")
+            self._log(f"✅ Modified user message with {'data URL' if data_url else 'download link'}")
         else:
             # Modify user message to tell AI export failed
             last_user_msg["content"] = (
