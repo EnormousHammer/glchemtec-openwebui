@@ -1,8 +1,8 @@
 """
 title: Document Export Filter
 author: GLChemTec
-version: 1.3
-description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads. Enhanced logging.
+version: 1.4
+description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads. Fixed file_id return.
 """
 
 import os
@@ -434,6 +434,7 @@ class Filter:
                     
                     return {
                         "success": True,
+                        "file_id": file_id,  # Include file_id for data URL fetch
                         "filename": result.get("filename", f"export.{format_type}"),
                         "size_bytes": result.get("size_bytes", 0),
                         "download_url": download_url,
