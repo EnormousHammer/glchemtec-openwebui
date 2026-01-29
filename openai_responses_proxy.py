@@ -1404,7 +1404,8 @@ async def chat_completions(request: Request):
     else:
         log("Using standard Chat Completions API")
     
-    # Clean PDF markers from messages before forwarding
+    # Clean PDF markers from messages and ensure images use high detail mode
+    # High detail is CRITICAL for NMR spectra - without it, peak values get hallucinated
     cleaned_messages = []
     for msg in messages:
         new_msg = msg.copy()
@@ -1412,9 +1413,44 @@ async def chat_completions(request: Request):
         if isinstance(content, str):
             cleaned, _ = extract_pdfs_and_clean_text(content)
             new_msg["content"] = cleaned
+        elif isinstance(content, list):
+            # Process list content - ensure all images have detail: high
+            new_content = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    # Ensure high detail mode for accurate NMR/spectrum analysis
+                    img_url = item.get("image_url", {})
+                    if isinstance(img_url, dict):
+                        # Add detail: high if not present
+                        if "detail" not in img_url:
+                            img_url = {**img_url, "detail": "high"}
+                        new_content.append({
+                            "type": "image_url",
+                            "image_url": img_url
+                        })
+                    elif isinstance(img_url, str):
+                        # Convert string URL to dict with high detail
+                        new_content.append({
+                            "type": "image_url",
+                            "image_url": {"url": img_url, "detail": "high"}
+                        })
+                    else:
+                        new_content.append(item)
+                elif isinstance(item, dict) and item.get("type") == "text":
+                    # Clean text content of PDF markers
+                    text = item.get("text", "")
+                    cleaned_text, _ = extract_pdfs_and_clean_text(text)
+                    new_content.append({"type": "text", "text": cleaned_text})
+                else:
+                    new_content.append(item)
+            new_msg["content"] = new_content
         cleaned_messages.append(new_msg)
     
     body["messages"] = cleaned_messages
+    
+    # Log if we're using high detail mode
+    if all_images:
+        log(f"📸 Images will use detail=high for accurate NMR/spectrum analysis")
     
     if stream:
         # Stream from Chat Completions with cancellation support
