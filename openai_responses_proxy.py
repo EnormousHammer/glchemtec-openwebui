@@ -1451,6 +1451,15 @@ async def chat_completions(request: Request):
     # Log if we're using high detail mode
     if all_images:
         log(f"📸 Images will use detail=high for accurate NMR/spectrum analysis")
+        # Debug: log the actual image structure being sent
+        for msg in cleaned_messages:
+            if isinstance(msg.get("content"), list):
+                for item in msg["content"]:
+                    if isinstance(item, dict) and item.get("type") == "image_url":
+                        img_data = item.get("image_url", {})
+                        detail = img_data.get("detail", "NOT SET")
+                        url_preview = str(img_data.get("url", ""))[:50]
+                        log(f"   📷 Image: detail={detail}, url={url_preview}...")
     
     if stream:
         # Stream from Chat Completions with cancellation support
