@@ -52,8 +52,6 @@ COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.p
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY document_filter.py /app/backend/filters/document_filter.py
 COPY document_filter.py /app/backend/custom/filters/document_filter.py
-COPY vision_nmr_strict_filter.py /app/backend/filters/vision_nmr_strict_filter.py
-COPY vision_nmr_strict_filter.py /app/backend/custom/filters/vision_nmr_strict_filter.py
 COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
 COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
