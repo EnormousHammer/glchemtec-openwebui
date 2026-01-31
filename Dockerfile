@@ -52,6 +52,8 @@ COPY sharepoint_import_filter.py /app/backend/filters/sharepoint_import_filter.p
 COPY sharepoint_import_filter.py /app/backend/custom/filters/sharepoint_import_filter.py
 COPY document_filter.py /app/backend/filters/document_filter.py
 COPY document_filter.py /app/backend/custom/filters/document_filter.py
+COPY vision_nmr_strict_filter.py /app/backend/filters/vision_nmr_strict_filter.py
+COPY vision_nmr_strict_filter.py /app/backend/custom/filters/vision_nmr_strict_filter.py
 COPY public/GLC_Logo.png /app/backend/open_webui/static/branding/GLC_Logo.png
 COPY public/GLC_icon.png /app/backend/open_webui/static/branding/GLC_icon.png
 COPY public/branding/glc-theme.css /app/backend/open_webui/static/branding/glc-theme.css
@@ -122,7 +124,8 @@ RUN chown -R 1000:1000 /app/backend/open_webui/static 2>/dev/null || true && \
 # Switch back to the original user
 USER 1000
 
-# Expose ports (8080 for OpenWebUI, 8000 for proxy)
-EXPOSE 8080 8000
+# Expose only the main OpenWebUI port - proxy runs internally on 8000
+# Render auto-detects the first EXPOSE port, so we only expose 8080
+EXPOSE 8080
 
 # Use base image's default entrypoint (it will call /app/backend/start.sh which we modified)
