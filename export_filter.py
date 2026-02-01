@@ -604,48 +604,32 @@ class Filter:
             
             # Use data URL if available (works without route registration)
             final_url = data_url or download_url
-            
-            # Generate unique ID for this download to prevent duplicate triggers
-            import hashlib
-            download_id = hashlib.md5(f"{filename}{file_size}".encode()).hexdigest()[:8]
-            js_safe_filename = filename.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
             safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
-            branding = self._get_branding_config()
-            
-            # JavaScript to auto-trigger download - embedded in the response
-            auto_download_script = f'''
-<script>
-(function() {{
-    var downloadKey = 'glc_download_{download_id}';
-    if (sessionStorage.getItem(downloadKey)) return;
-    sessionStorage.setItem(downloadKey, 'true');
-    setTimeout(function() {{
-        var link = document.createElement('a');
-        link.href = '{final_url}';
-        link.download = '{js_safe_filename}';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        console.log('[GLChemTec Export] Auto-download triggered for: {js_safe_filename}');
-    }}, 500);
-}})();
-</script>
-'''
+            is_data_url = final_url.startswith("data:")
             
             # Modify the user's message to include export instruction for the AI
             # This way the AI will respond with the download link naturally
-            last_user_msg["content"] = (
-                f"{user_content}\n\n"
-                f"[SYSTEM: Export has been created successfully. "
-                f"Respond with ONLY this exact message, nothing else:\n\n"
-                f"✅ **Export Ready!**\n\n"
-                f"🎉 **Your download should start automatically!**\n\n"
-                f"If it doesn't, click the button below:\n\n"
-                f"<a href=\"{final_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0; font-size: 16px; cursor: pointer;\">📥 Download {safe_filename}</a>\n\n"
-                f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*\n\n"
-                f"{auto_download_script}]"
-            )
+            if is_data_url:
+                # For data URLs, use HTML link with download attribute
+                last_user_msg["content"] = (
+                    f"{user_content}\n\n"
+                    f"[SYSTEM: Export has been created successfully. "
+                    f"Respond with ONLY this exact message, nothing else:\n\n"
+                    f"✅ **Export Ready!**\n\n"
+                    f"Click the button below to download:\n\n"
+                    f"<a href=\"{final_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: #1d2b3a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;\">📥 Download {safe_filename}</a>\n\n"
+                    f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
+                )
+            else:
+                # For server URLs, use simple markdown link (more compatible)
+                last_user_msg["content"] = (
+                    f"{user_content}\n\n"
+                    f"[SYSTEM: Export has been created successfully. "
+                    f"Respond with ONLY this exact message, nothing else:\n\n"
+                    f"✅ **Export Ready!**\n\n"
+                    f"📥 **[Click here to download {safe_filename}]({final_url})**\n\n"
+                    f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
+                )
             
             self._log(f"✅ Modified user message with {'data URL' if data_url else 'download link'}")
         else:
@@ -743,50 +727,29 @@ class Filter:
                 
                 # Check if the download link is already in the response
                 if download_url not in content:
-                    # Add the download link - provide both HTML button and direct link
-                    # Use both formats for maximum compatibility
-                    # Escape filename for HTML
+                    # Escape filename for HTML/markdown
                     safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
-                    js_safe_filename = filename.replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"')
                     
-                    # Generate unique ID for this download to prevent duplicate triggers
-                    import hashlib
-                    download_id = hashlib.md5(f"{filename}{file_size}".encode()).hexdigest()[:8]
+                    # Check if this is a data URL (works directly) or a server URL
+                    is_data_url = download_url.startswith("data:")
                     
-                    # JavaScript to auto-trigger download when rendered
-                    # Uses data URL which works reliably across browsers
-                    auto_download_script = f'''
-<script>
-(function() {{
-    // Only trigger once per download
-    var downloadKey = 'glc_download_{download_id}';
-    if (sessionStorage.getItem(downloadKey)) return;
-    sessionStorage.setItem(downloadKey, 'true');
-    
-    // Auto-trigger download after short delay
-    setTimeout(function() {{
-        var link = document.createElement('a');
-        link.href = '{download_url}';
-        link.download = '{js_safe_filename}';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        console.log('[GLChemTec Export] Auto-download triggered for: {js_safe_filename}');
-    }}, 500);
-}})();
-</script>
-'''
-                    
-                    export_note = (
-                        f"\n\n---\n"
-                        f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
-                        f"🎉 **Download should start automatically!**\n\n"
-                        f"If it doesn't, click the button below:\n\n"
-                        f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0; font-size: 16px; cursor: pointer;\">📥 Download {safe_filename}</a>\n\n"
-                        f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*\n\n"
-                        f"{auto_download_script}"
-                    )
+                    if is_data_url:
+                        # For data URLs, we need the HTML link with download attribute
+                        export_note = (
+                            f"\n\n---\n"
+                            f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
+                            f"Click to download your file:\n\n"
+                            f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0;\">📥 Download {safe_filename}</a>\n\n"
+                            f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*"
+                        )
+                    else:
+                        # For server URLs, use simple markdown link (more compatible)
+                        export_note = (
+                            f"\n\n---\n"
+                            f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
+                            f"📥 **[Click here to download {safe_filename}]({download_url})**\n\n"
+                            f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*"
+                        )
                     
                     # Modify assistant message content (like SharePoint filter does)
                     if isinstance(last_assistant_msg.get("content"), str):
