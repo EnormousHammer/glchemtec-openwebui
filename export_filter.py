@@ -376,7 +376,7 @@ class Filter:
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
     
-    def _create_export_with_link(self, report: Dict[str, Any], format_type: str, messages: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+    def _create_export_with_link(self, report: Dict[str, Any], format_type: str, messages: Optional[List[Dict[str, Any]]] = None, __user__: Optional[dict] = None) -> Optional[Dict[str, Any]]:
         """Create export file via proxy endpoint and return download link."""
         try:
             # Use the proxy's export/create endpoint which handles file storage and returns a download URL
@@ -408,9 +408,25 @@ class Filter:
                     file_bytes_b64 = result.get("file_bytes_b64")
                     
                     if file_bytes_b64:
-                        # Create data URL directly from included bytes
+                        # Decode file bytes
+                        file_bytes = base64.b64decode(file_bytes_b64)
+                        
+                        # Try Method 1: Upload to OpenWebUI's native file system (most reliable)
+                        openwebui_url = self._upload_to_openwebui(file_bytes, filename, mime_type, __user__)
+                        if openwebui_url:
+                            self._log(f"✅ Using OpenWebUI native file system: {openwebui_url}")
+                            return {
+                                "success": True,
+                                "file_id": file_id,
+                                "filename": filename,
+                                "size_bytes": size_bytes,
+                                "download_url": openwebui_url,
+                                "is_data_url": False  # It's a real URL, not data URL
+                            }
+                        
+                        # Fallback Method 2: Create data URL (works but may have size limits)
                         data_url = f"data:{mime_type};base64,{file_bytes_b64}"
-                        self._log(f"✅ Created data URL directly from response ({size_bytes} bytes, {len(file_bytes_b64)} base64 chars)")
+                        self._log(f"✅ Created data URL as fallback ({size_bytes} bytes)")
                         
                         return {
                             "success": True,
@@ -524,6 +540,60 @@ class Filter:
             self._log(f"Traceback: {traceback.format_exc()}")
             return None
 
+    def _upload_to_openwebui(self, file_bytes: bytes, filename: str, mime_type: str, __user__: Optional[dict] = None) -> Optional[str]:
+        """
+        Upload file to OpenWebUI's native file system and return download URL.
+        This is the most reliable way to serve files to users.
+        """
+        try:
+            # Get the public URL for OpenWebUI
+            public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+            if not public_url:
+                self._log("No public URL configured, cannot upload to OpenWebUI")
+                return None
+            
+            # OpenWebUI's file upload endpoint
+            upload_url = f"{public_url}/api/v1/files/"
+            
+            # Get user token if available (needed for authenticated upload)
+            user_token = None
+            if __user__ and isinstance(__user__, dict):
+                user_token = __user__.get("token") or __user__.get("api_key")
+            
+            # Prepare multipart form data
+            files = {
+                'file': (filename, io.BytesIO(file_bytes), mime_type)
+            }
+            
+            headers = {}
+            if user_token:
+                headers["Authorization"] = f"Bearer {user_token}"
+            
+            self._log(f"Uploading {filename} ({len(file_bytes)} bytes) to OpenWebUI: {upload_url}")
+            
+            response = requests.post(upload_url, files=files, headers=headers, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                file_id = result.get("id")
+                if file_id:
+                    # Construct download URL using OpenWebUI's file endpoint
+                    download_url = f"{public_url}/api/v1/files/{file_id}/content"
+                    self._log(f"✅ Uploaded to OpenWebUI: {download_url}")
+                    return download_url
+                else:
+                    self._log(f"Upload succeeded but no file ID returned: {result}")
+                    return None
+            else:
+                self._log(f"OpenWebUI upload failed: {response.status_code} - {response.text[:200]}")
+                return None
+                
+        except Exception as e:
+            self._log(f"OpenWebUI upload error: {e}")
+            import traceback
+            self._log(f"Traceback: {traceback.format_exc()}")
+            return None
+
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         """
         Input filter - detects export requests and generates files BEFORE assistant responds.
@@ -563,7 +633,7 @@ class Filter:
         self._log(f"Report structure: title='{report.get('title')}', sections={len(report.get('sections', []))}")
         
         # 3) Create export via proxy (existing logic)
-        export_result = self._create_export_with_link(report, export_format, messages)
+        export_result = self._create_export_with_link(report, export_format, messages, __user__)
         
         if export_result and export_result.get("success"):
             download_url = export_result.get("download_url", "")
@@ -670,7 +740,7 @@ class Filter:
                     self._log(f"Export request detected in outlet (fallback): {export_format.upper()}")
                     # Generate file now (fallback if inlet didn't run)
                     report = self._build_report_from_conversation(messages, export_format)
-                    export_result = self._create_export_with_link(report, export_format)
+                    export_result = self._create_export_with_link(report, export_format, None, __user__)
                     
                     if export_result and export_result.get("success"):
                         export_file_info = {
