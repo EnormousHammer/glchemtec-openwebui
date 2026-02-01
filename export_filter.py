@@ -661,7 +661,8 @@ class Filter:
                 "download_url": download_url,
                 "format": export_format,
                 "size": file_size,
-                "is_data_url": is_data_url
+                "is_data_url": is_data_url,
+                "handled_by_inlet": True  # Flag to prevent outlet from creating duplicate
             }
             
             safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
@@ -671,28 +672,20 @@ class Filter:
             # The user can copy-paste the link or we can try the server URL
             
             if is_data_url:
-                # Data URLs are too long to display - use the server download URL instead
-                # The proxy stores the file and can serve it
-                public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
-                file_id = export_result.get("file_id", "")
-                if public_url and file_id:
-                    server_url = f"{public_url}/v1/export/download/{file_id}"
-                    self._log(f"Using server URL instead of data URL: {server_url}")
-                    last_user_msg["content"] = (
-                        f"{user_content}\n\n"
-                        f"[SYSTEM: Export has been created successfully. "
-                        f"Respond with ONLY this exact message, nothing else:\n\n"
-                        f"✅ **Export Ready!**\n\n"
-                        f"📥 **[Click here to download {safe_filename}]({server_url})**\n\n"
-                        f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
-                    )
-                else:
-                    # No server URL available - tell user to try again
-                    last_user_msg["content"] = (
-                        f"{user_content}\n\n"
-                        f"[SYSTEM: Export was created but download link unavailable. "
-                        f"Respond with: ❌ Export created but download link failed. Please try again.]"
-                    )
+                # Data URLs contain the entire file - they work without server routes
+                # But they're very long, so we need to handle them carefully
+                self._log(f"Using data URL directly for download (length: {len(download_url)} chars)")
+                
+                # Store the data URL in metadata so outlet can use it
+                body["metadata"]["export_file"]["data_url"] = download_url
+                
+                # For the AI response, we'll use a simpler message
+                # The outlet will add the actual download link with proper HTML
+                last_user_msg["content"] = (
+                    f"{user_content}\n\n"
+                    f"[SYSTEM: Export file has been created successfully ({file_size_kb}KB {export_format.upper()}). "
+                    f"Respond with ONLY: '✅ Your {export_format.upper()} export is ready! Click the download button below.']"
+                )
             else:
                 # For server URLs, use simple markdown link
                 last_user_msg["content"] = (
@@ -742,12 +735,29 @@ class Filter:
             self._log("No messages in body")
             return body
 
-        # Check if we have export file info from inlet
+        # Check if we have export file info from inlet (metadata may not persist between inlet/outlet)
         export_file_info = None
         if isinstance(body.get("metadata"), dict):
             export_file_info = body["metadata"].get("export_file")
+            if export_file_info:
+                self._log(f"Found export_file_info from inlet metadata: {export_file_info.get('filename')}")
         
-        # If no metadata, check user message for export request (fallback)
+        # Check if the assistant response already contains a download indicator
+        # This prevents duplicate processing
+        last_assistant_msg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                last_assistant_msg = msg
+                break
+        
+        if last_assistant_msg:
+            assistant_content = self._extract_text_content(last_assistant_msg.get("content", ""))
+            # Check if export was already handled (look for our export markers)
+            if "Export is Ready" in assistant_content or "export is ready" in assistant_content or "Click to Download" in assistant_content:
+                self._log("Export already in assistant response, skipping outlet processing")
+                return body
+        
+        # If no metadata from inlet, check if this is an export request (fallback)
         if not export_file_info:
             last_user_msg = None
             for msg in reversed(messages):
@@ -799,21 +809,26 @@ class Filter:
                 icon = self._get_document_icon(export_format)
                 
                 # Check if the download link is already in the response
-                if download_url not in content:
+                # For data URLs, check for filename instead (data URLs are too long to search)
+                is_data_url = download_url.startswith("data:")
+                already_has_link = (filename in content) or ("Click to Download" in content) or (not is_data_url and download_url in content)
+                
+                if not already_has_link:
                     # Escape filename for HTML/markdown
                     safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
                     
-                    # Check if this is a data URL (works directly) or a server URL
-                    is_data_url = download_url.startswith("data:")
-                    
                     if is_data_url:
-                        # For data URLs, we need the HTML link with download attribute
+                        # For data URLs, use HTML with download attribute
+                        # This creates a clickable button that triggers file download
                         export_note = (
                             f"\n\n---\n"
                             f"{icon} **Your {export_format.upper()} Export is Ready!**\n\n"
-                            f"Click to download your file:\n\n"
-                            f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: {branding['primary_color']}; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 8px 0;\">📥 Download {safe_filename}</a>\n\n"
-                            f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*"
+                            f"<a href=\"{download_url}\" download=\"{safe_filename}\" "
+                            f"style=\"display:inline-block;padding:12px 24px;background-color:{branding['primary_color']};"
+                            f"color:white;text-decoration:none;border-radius:6px;font-weight:bold;cursor:pointer;\">"
+                            f"📥 Click to Download {safe_filename}</a>\n\n"
+                            f"*File size: {file_size_kb}KB | Format: {export_format.upper()} | Generated by {branding['company_name']}*\n\n"
+                            f"*If the button doesn't work, right-click and select 'Save link as...'*"
                         )
                     else:
                         # For server URLs, use simple markdown link (more compatible)
@@ -841,7 +856,9 @@ class Filter:
                             {"type": "text", "text": export_note}
                         ]
                     
-                    self._log(f"✅ Added download link to assistant response: {download_url}")
+                    # Log without the full data URL (too long)
+                    url_preview = download_url[:100] + "..." if len(download_url) > 100 else download_url
+                    self._log(f"✅ Added download link to assistant response: {url_preview}")
                 else:
                     self._log(f"Download link already in response: {filename}")
             else:
