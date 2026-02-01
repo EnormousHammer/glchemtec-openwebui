@@ -424,47 +424,20 @@ class Filter:
                     file_bytes_b64 = result.get("file_bytes_b64")
                     self._log(f"file_bytes_b64 present: {bool(file_bytes_b64)}, length: {len(file_bytes_b64) if file_bytes_b64 else 0}")
                     
-                    public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
-                    
-                    # STRATEGY 1: Try uploading to OpenWebUI's native file system (most reliable)
-                    if file_bytes_b64 and __user__:
-                        file_bytes = base64.b64decode(file_bytes_b64)
-                        openwebui_url = self._upload_to_openwebui(file_bytes, filename, mime_type, __user__)
-                        if openwebui_url:
-                            self._log(f"✅ Using OpenWebUI native file URL: {openwebui_url}")
-                            return {
-                                "success": True,
-                                "file_id": file_id,
-                                "filename": filename,
-                                "size_bytes": size_bytes,
-                                "download_url": openwebui_url,
-                                "is_data_url": False
-                            }
-                    
-                    # STRATEGY 2: Use proxy server URL (routes registered via backend_startup_hook.py)
-                    if public_url:
-                        download_url = f"{public_url}/v1/export/download/{file_id}"
-                        self._log(f"✅ Using proxy server URL for download: {download_url}")
-                        return {
-                            "success": True,
-                            "file_id": file_id,
-                            "filename": filename,
-                            "size_bytes": size_bytes,
-                            "download_url": download_url,
-                            "is_data_url": False
-                        }
-                    
-                    # STRATEGY 3: Fallback to data URL (works but very long)
+                    # USE DATA URL - embeds file directly, no server routes needed
+                    # This is the most reliable method as it doesn't depend on any routing
                     if file_bytes_b64:
                         data_url = f"data:{mime_type};base64,{file_bytes_b64}"
-                        self._log(f"⚠️ Using data URL fallback ({size_bytes} bytes)")
+                        self._log(f"✅ Using data URL for download ({size_bytes} bytes, {len(data_url)} chars)")
                         return {
                             "success": True,
                             "file_id": file_id,
                             "filename": filename,
                             "size_bytes": size_bytes,
                             "download_url": data_url,
-                            "is_data_url": True
+                            "is_data_url": True,
+                            "file_bytes_b64": file_bytes_b64,  # Keep for HTML generation
+                            "mime_type": mime_type
                         }
                     else:
                         self._log(f"❌ No public URL and no file bytes - cannot create download link")
