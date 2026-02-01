@@ -2338,12 +2338,19 @@ async def create_export_file(request: Request):
         
         log(f"Export file created: {filename} (ID: {file_id}, {len(file_bytes):,} bytes, {len(file_bytes)/1024:.1f} KB)")
         
+        # Include base64-encoded file bytes directly in response
+        # This eliminates the need for a second request to download
+        b64_data = base64.b64encode(file_bytes).decode('utf-8')
+        log(f"Encoded file to base64: {len(b64_data):,} chars")
+        
         return JSONResponse({
             "success": True,
             "file_id": file_id,
             "filename": filename,
             "size_bytes": len(file_bytes),
-            "download_url": f"/v1/export/download/{file_id}"
+            "download_url": f"/v1/export/download/{file_id}",
+            "file_bytes_b64": b64_data,  # Include file bytes directly
+            "mime_type": mime_type
         })
         
     except Exception as e:

@@ -399,38 +399,46 @@ class Filter:
             if response.status_code == 200:
                 result = response.json()
                 if result.get("success"):
-                    # Get the download URL - must be publicly accessible from browser
                     file_id = result.get("file_id")
+                    filename = result.get("filename", f"export.{format_type}")
+                    size_bytes = result.get("size_bytes", 0)
+                    mime_type = result.get("mime_type", "application/octet-stream")
                     
-                    # Proxy runs on localhost:8000 but Render only exposes port 8080
-                    # So we MUST use public_base_url (OpenWebUI's public URL) for browser access
-                    # The proxy endpoints are routed through OpenWebUI via backend_startup_hook.py
-                    public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+                    # Check if file bytes are included directly (preferred - no second request needed)
+                    file_bytes_b64 = result.get("file_bytes_b64")
                     
-                    if public_url:
-                        # Use public URL - proxy routes are accessible via OpenWebUI's domain
-                        # Routes should be registered via register_export_routes.py or export_route_handler.py
-                        download_url = f"{public_url}/v1/export/download/{file_id}"
-                        self._log(f"✅ Using public URL for download: {download_url}")
-                        self._log(f"   File ID: {file_id}, Size: {result.get('size_bytes', 0)} bytes")
+                    if file_bytes_b64:
+                        # Create data URL directly from included bytes
+                        data_url = f"data:{mime_type};base64,{file_bytes_b64}"
+                        self._log(f"✅ Created data URL directly from response ({size_bytes} bytes, {len(file_bytes_b64)} base64 chars)")
+                        
+                        return {
+                            "success": True,
+                            "file_id": file_id,
+                            "filename": filename,
+                            "size_bytes": size_bytes,
+                            "download_url": data_url,
+                            "is_data_url": True
+                        }
                     else:
-                        # Fallback: try to construct from request (last resort)
-                        # This won't work but at least we tried
-                        download_url = f"http://127.0.0.1:8000/v1/export/download/{file_id}"
-                        self._log(f"⚠️ WARNING: No public URL found - download will fail: {download_url}")
-                        self._log(f"   Please set WEBUI_URL or PUBLIC_URL environment variable")
-                        self._log(f"   File created but download link will not work without public URL")
-                    
-                    self._log(f"Export created: {result.get('filename')} (ID: {file_id}, URL: {download_url})")
-                    
-                    return {
-                        "success": True,
-                        "file_id": file_id,  # Include file_id for data URL fetch
-                        "filename": result.get("filename", f"export.{format_type}"),
-                        "size_bytes": result.get("size_bytes", 0),
-                        "download_url": download_url,
-                        "is_data_url": False
-                    }
+                        # Fallback: construct download URL (may not work if routes aren't registered)
+                        public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+                        
+                        if public_url:
+                            download_url = f"{public_url}/v1/export/download/{file_id}"
+                            self._log(f"Using public URL for download: {download_url}")
+                        else:
+                            download_url = f"http://127.0.0.1:8000/v1/export/download/{file_id}"
+                            self._log(f"⚠️ WARNING: No public URL found - download may fail")
+                        
+                        return {
+                            "success": True,
+                            "file_id": file_id,
+                            "filename": filename,
+                            "size_bytes": size_bytes,
+                            "download_url": download_url,
+                            "is_data_url": False
+                        }
                 else:
                     self._log(f"Export creation failed: {result}")
                     return None
@@ -562,50 +570,22 @@ class Filter:
             filename = export_result.get("filename", f"export.{export_format}")
             file_size = export_result.get("size_bytes", 0)
             file_size_kb = file_size // 1024 if file_size else 0
+            is_data_url = export_result.get("is_data_url", False)
             
-            self._log(f"Export file created: {filename} ({file_size_kb}KB)")
-            
-            # Try to get the file bytes directly and create a data URL
-            data_url = None
-            file_id = export_result.get('file_id', '')
-            try:
-                # Fetch the file directly from proxy
-                download_endpoint = f"{self.valves.export_service_url}/v1/export/download/{file_id}"
-                self._log(f"Fetching file from: {download_endpoint}")
-                file_response = requests.get(download_endpoint, timeout=30)
-                self._log(f"Download response: {file_response.status_code}, size: {len(file_response.content)} bytes")
-                
-                if file_response.status_code == 200:
-                    file_bytes = file_response.content
-                    if len(file_bytes) > 0:
-                        b64_data = base64.b64encode(file_bytes).decode('utf-8')
-                        mime_type = "application/pdf" if export_format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        data_url = f"data:{mime_type};base64,{b64_data}"
-                        self._log(f"✅ Created data URL for direct download ({len(file_bytes)//1024}KB file, {len(b64_data)//1024}KB base64)")
-                    else:
-                        self._log(f"⚠️ Downloaded file is empty!")
-                else:
-                    self._log(f"⚠️ Download failed: HTTP {file_response.status_code} - {file_response.text[:200]}")
-            except Exception as e:
-                self._log(f"⚠️ Could not create data URL: {e}")
-                import traceback
-                self._log(f"Traceback: {traceback.format_exc()}")
+            self._log(f"✅ Export file created: {filename} ({file_size_kb}KB, data_url={is_data_url})")
             
             # Store export info in metadata for outlet to use
             if "metadata" not in body:
                 body["metadata"] = {}
             body["metadata"]["export_file"] = {
                 "filename": filename,
-                "download_url": data_url or download_url,
+                "download_url": download_url,
                 "format": export_format,
                 "size": file_size,
-                "is_data_url": data_url is not None
+                "is_data_url": is_data_url
             }
             
-            # Use data URL if available (works without route registration)
-            final_url = data_url or download_url
             safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
-            is_data_url = final_url.startswith("data:")
             
             # Modify the user's message to include export instruction for the AI
             # This way the AI will respond with the download link naturally
@@ -617,7 +597,7 @@ class Filter:
                     f"Respond with ONLY this exact message, nothing else:\n\n"
                     f"✅ **Export Ready!**\n\n"
                     f"Click the button below to download:\n\n"
-                    f"<a href=\"{final_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: #1d2b3a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;\">📥 Download {safe_filename}</a>\n\n"
+                    f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: #1d2b3a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;\">📥 Download {safe_filename}</a>\n\n"
                     f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
                 )
             else:
@@ -627,11 +607,11 @@ class Filter:
                     f"[SYSTEM: Export has been created successfully. "
                     f"Respond with ONLY this exact message, nothing else:\n\n"
                     f"✅ **Export Ready!**\n\n"
-                    f"📥 **[Click here to download {safe_filename}]({final_url})**\n\n"
+                    f"📥 **[Click here to download {safe_filename}]({download_url})**\n\n"
                     f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
                 )
             
-            self._log(f"✅ Modified user message with {'data URL' if data_url else 'download link'}")
+            self._log(f"✅ Modified user message with {'data URL' if is_data_url else 'download link'}")
         else:
             # Modify user message to tell AI export failed
             last_user_msg["content"] = (
