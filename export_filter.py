@@ -413,6 +413,7 @@ class Filter:
             
             if response.status_code == 200:
                 result = response.json()
+                self._log(f"Export response keys: {list(result.keys())}")
                 if result.get("success"):
                     file_id = result.get("file_id")
                     filename = result.get("filename", f"export.{format_type}")
@@ -421,6 +422,7 @@ class Filter:
                     
                     # Check if file bytes are included directly (preferred - no second request needed)
                     file_bytes_b64 = result.get("file_bytes_b64")
+                    self._log(f"file_bytes_b64 present: {bool(file_bytes_b64)}, length: {len(file_bytes_b64) if file_bytes_b64 else 0}")
                     
                     if file_bytes_b64:
                         # Decode file bytes (for size calculation)
