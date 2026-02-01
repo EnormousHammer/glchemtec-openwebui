@@ -1,8 +1,8 @@
 """
 title: Document Export Filter
 author: GLChemTec
-version: 1.4
-description: Detects export requests and generates Word/PDF files. Uses data URLs for reliable downloads. Fixed file_id return.
+version: 1.5
+description: Detects export requests and generates Word/PDF files. Uses server download URLs.
 """
 
 import os
@@ -16,6 +16,21 @@ from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+
+# Register export proxy routes with OpenWebUI when this filter loads
+# This ensures /v1/export/* routes are available for file downloads
+try:
+    import backend_startup_hook
+    print("[EXPORT-FILTER] ✅ Export proxy routes registered")
+except ImportError:
+    try:
+        # Try alternative path
+        import sys
+        sys.path.insert(0, '/app/backend')
+        import backend_startup_hook
+        print("[EXPORT-FILTER] ✅ Export proxy routes registered (alt path)")
+    except Exception as e:
+        print(f"[EXPORT-FILTER] ⚠️ Could not register export routes: {e}")
 
 
 class Filter:
@@ -657,21 +672,35 @@ class Filter:
             
             safe_filename = filename.replace('"', '&quot;').replace("'", "&#39;")
             
-            # Modify the user's message to include export instruction for the AI
-            # This way the AI will respond with the download link naturally
+            # Since OpenWebUI doesn't render HTML in responses, we need to use markdown
+            # For data URLs, we'll provide instructions and the raw link
+            # The user can copy-paste the link or we can try the server URL
+            
             if is_data_url:
-                # For data URLs, use HTML link with download attribute
-                last_user_msg["content"] = (
-                    f"{user_content}\n\n"
-                    f"[SYSTEM: Export has been created successfully. "
-                    f"Respond with ONLY this exact message, nothing else:\n\n"
-                    f"✅ **Export Ready!**\n\n"
-                    f"Click the button below to download:\n\n"
-                    f"<a href=\"{download_url}\" download=\"{safe_filename}\" style=\"display: inline-block; padding: 12px 24px; background-color: #1d2b3a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;\">📥 Download {safe_filename}</a>\n\n"
-                    f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
-                )
+                # Data URLs are too long to display - use the server download URL instead
+                # The proxy stores the file and can serve it
+                public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+                file_id = export_result.get("file_id", "")
+                if public_url and file_id:
+                    server_url = f"{public_url}/v1/export/download/{file_id}"
+                    self._log(f"Using server URL instead of data URL: {server_url}")
+                    last_user_msg["content"] = (
+                        f"{user_content}\n\n"
+                        f"[SYSTEM: Export has been created successfully. "
+                        f"Respond with ONLY this exact message, nothing else:\n\n"
+                        f"✅ **Export Ready!**\n\n"
+                        f"📥 **[Click here to download {safe_filename}]({server_url})**\n\n"
+                        f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
+                    )
+                else:
+                    # No server URL available - tell user to try again
+                    last_user_msg["content"] = (
+                        f"{user_content}\n\n"
+                        f"[SYSTEM: Export was created but download link unavailable. "
+                        f"Respond with: ❌ Export created but download link failed. Please try again.]"
+                    )
             else:
-                # For server URLs, use simple markdown link (more compatible)
+                # For server URLs, use simple markdown link
                 last_user_msg["content"] = (
                     f"{user_content}\n\n"
                     f"[SYSTEM: Export has been created successfully. "
@@ -681,7 +710,7 @@ class Filter:
                     f"*File size: {file_size_kb}KB | Format: {export_format.upper()}*]"
                 )
             
-            self._log(f"✅ Modified user message with {'data URL' if is_data_url else 'download link'}")
+            self._log(f"✅ Modified user message with server download link")
         else:
             # Modify user message to tell AI export failed
             last_user_msg["content"] = (
