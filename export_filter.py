@@ -424,19 +424,25 @@ class Filter:
                     file_bytes_b64 = result.get("file_bytes_b64")
                     self._log(f"file_bytes_b64 present: {bool(file_bytes_b64)}, length: {len(file_bytes_b64) if file_bytes_b64 else 0}")
                     
-                    if file_bytes_b64:
-                        # Decode file bytes (for size calculation)
-                        file_bytes = base64.b64decode(file_bytes_b64)
-                        
-                        # NOTE: We skip uploading to OpenWebUI's file system because it causes
-                        # a self-referential HTTP request that deadlocks the server on Render.
-                        # The service tries to POST to itself, which times out and can crash.
-                        # Instead, we use data URLs which work reliably for most file sizes.
-                        
-                        # Create data URL (works reliably, no self-referential request)
+                    # PREFER SERVER URL - routes are registered via backend_startup_hook.py
+                    # Server URLs work better with markdown links and don't have size limits
+                    public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
+                    
+                    if public_url:
+                        download_url = f"{public_url}/v1/export/download/{file_id}"
+                        self._log(f"✅ Using server URL for download: {download_url}")
+                        return {
+                            "success": True,
+                            "file_id": file_id,
+                            "filename": filename,
+                            "size_bytes": size_bytes,
+                            "download_url": download_url,
+                            "is_data_url": False
+                        }
+                    elif file_bytes_b64:
+                        # Fallback to data URL if no public URL configured
                         data_url = f"data:{mime_type};base64,{file_bytes_b64}"
-                        self._log(f"✅ Created data URL for download ({size_bytes} bytes)")
-                        
+                        self._log(f"⚠️ No public URL - using data URL fallback ({size_bytes} bytes)")
                         return {
                             "success": True,
                             "file_id": file_id,
@@ -446,24 +452,8 @@ class Filter:
                             "is_data_url": True
                         }
                     else:
-                        # Fallback: construct download URL (may not work if routes aren't registered)
-                        public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
-                        
-                        if public_url:
-                            download_url = f"{public_url}/v1/export/download/{file_id}"
-                            self._log(f"Using public URL for download: {download_url}")
-                        else:
-                            download_url = f"http://127.0.0.1:8000/v1/export/download/{file_id}"
-                            self._log(f"⚠️ WARNING: No public URL found - download may fail")
-                        
-                        return {
-                            "success": True,
-                            "file_id": file_id,
-                            "filename": filename,
-                            "size_bytes": size_bytes,
-                            "download_url": download_url,
-                            "is_data_url": False
-                        }
+                        self._log(f"❌ No public URL and no file bytes - cannot create download link")
+                        return None
                 else:
                     self._log(f"Export creation failed: {result}")
                     return None
