@@ -423,25 +423,17 @@ class Filter:
                     file_bytes_b64 = result.get("file_bytes_b64")
                     
                     if file_bytes_b64:
-                        # Decode file bytes
+                        # Decode file bytes (for size calculation)
                         file_bytes = base64.b64decode(file_bytes_b64)
                         
-                        # Try Method 1: Upload to OpenWebUI's native file system (most reliable)
-                        openwebui_url = self._upload_to_openwebui(file_bytes, filename, mime_type, __user__)
-                        if openwebui_url:
-                            self._log(f"✅ Using OpenWebUI native file system: {openwebui_url}")
-                            return {
-                                "success": True,
-                                "file_id": file_id,
-                                "filename": filename,
-                                "size_bytes": size_bytes,
-                                "download_url": openwebui_url,
-                                "is_data_url": False  # It's a real URL, not data URL
-                            }
+                        # NOTE: We skip uploading to OpenWebUI's file system because it causes
+                        # a self-referential HTTP request that deadlocks the server on Render.
+                        # The service tries to POST to itself, which times out and can crash.
+                        # Instead, we use data URLs which work reliably for most file sizes.
                         
-                        # Fallback Method 2: Create data URL (works but may have size limits)
+                        # Create data URL (works reliably, no self-referential request)
                         data_url = f"data:{mime_type};base64,{file_bytes_b64}"
-                        self._log(f"✅ Created data URL as fallback ({size_bytes} bytes)")
+                        self._log(f"✅ Created data URL for download ({size_bytes} bytes)")
                         
                         return {
                             "success": True,
