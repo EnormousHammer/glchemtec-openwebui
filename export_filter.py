@@ -420,17 +420,31 @@ class Filter:
                     size_bytes = result.get("size_bytes", 0)
                     mime_type = result.get("mime_type", "application/octet-stream")
                     
-                    # Check if file bytes are included directly (preferred - no second request needed)
+                    # Check if file bytes are included directly
                     file_bytes_b64 = result.get("file_bytes_b64")
                     self._log(f"file_bytes_b64 present: {bool(file_bytes_b64)}, length: {len(file_bytes_b64) if file_bytes_b64 else 0}")
                     
-                    # PREFER SERVER URL - routes are registered via backend_startup_hook.py
-                    # Server URLs work better with markdown links and don't have size limits
                     public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("PUBLIC_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
                     
+                    # STRATEGY 1: Try uploading to OpenWebUI's native file system (most reliable)
+                    if file_bytes_b64 and __user__:
+                        file_bytes = base64.b64decode(file_bytes_b64)
+                        openwebui_url = self._upload_to_openwebui(file_bytes, filename, mime_type, __user__)
+                        if openwebui_url:
+                            self._log(f"✅ Using OpenWebUI native file URL: {openwebui_url}")
+                            return {
+                                "success": True,
+                                "file_id": file_id,
+                                "filename": filename,
+                                "size_bytes": size_bytes,
+                                "download_url": openwebui_url,
+                                "is_data_url": False
+                            }
+                    
+                    # STRATEGY 2: Use proxy server URL (routes registered via backend_startup_hook.py)
                     if public_url:
                         download_url = f"{public_url}/v1/export/download/{file_id}"
-                        self._log(f"✅ Using server URL for download: {download_url}")
+                        self._log(f"✅ Using proxy server URL for download: {download_url}")
                         return {
                             "success": True,
                             "file_id": file_id,
@@ -439,10 +453,11 @@ class Filter:
                             "download_url": download_url,
                             "is_data_url": False
                         }
-                    elif file_bytes_b64:
-                        # Fallback to data URL if no public URL configured
+                    
+                    # STRATEGY 3: Fallback to data URL (works but very long)
+                    if file_bytes_b64:
                         data_url = f"data:{mime_type};base64,{file_bytes_b64}"
-                        self._log(f"⚠️ No public URL - using data URL fallback ({size_bytes} bytes)")
+                        self._log(f"⚠️ Using data URL fallback ({size_bytes} bytes)")
                         return {
                             "success": True,
                             "file_id": file_id,
@@ -542,33 +557,34 @@ class Filter:
     def _upload_to_openwebui(self, file_bytes: bytes, filename: str, mime_type: str, __user__: Optional[dict] = None) -> Optional[str]:
         """
         Upload file to OpenWebUI's native file system and return download URL.
-        This is the most reliable way to serve files to users.
+        Uses internal localhost URL to avoid self-referential request issues.
         """
         try:
-            # Get the public URL for OpenWebUI
+            # Use internal URL to avoid self-referential request deadlock
+            # OpenWebUI runs on port 8080 internally
+            internal_url = "http://127.0.0.1:8080"
             public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
-            if not public_url:
-                self._log("No public URL configured, cannot upload to OpenWebUI")
-                return None
             
-            # OpenWebUI's file upload endpoint
-            upload_url = f"{public_url}/api/v1/files/"
+            # OpenWebUI's file upload endpoint (internal)
+            upload_url = f"{internal_url}/api/v1/files/"
             
             # Get user token if available (needed for authenticated upload)
             user_token = None
             if __user__ and isinstance(__user__, dict):
                 user_token = __user__.get("token") or __user__.get("api_key")
             
+            if not user_token:
+                self._log("No user token available for OpenWebUI upload")
+                return None
+            
             # Prepare multipart form data
             files = {
                 'file': (filename, io.BytesIO(file_bytes), mime_type)
             }
             
-            headers = {}
-            if user_token:
-                headers["Authorization"] = f"Bearer {user_token}"
+            headers = {"Authorization": f"Bearer {user_token}"}
             
-            self._log(f"Uploading {filename} ({len(file_bytes)} bytes) to OpenWebUI: {upload_url}")
+            self._log(f"Uploading {filename} ({len(file_bytes)} bytes) to OpenWebUI internal: {upload_url}")
             
             response = requests.post(upload_url, files=files, headers=headers, timeout=60)
             
@@ -576,8 +592,11 @@ class Filter:
                 result = response.json()
                 file_id = result.get("id")
                 if file_id:
-                    # Construct download URL using OpenWebUI's file endpoint
-                    download_url = f"{public_url}/api/v1/files/{file_id}/content"
+                    # Construct download URL using public URL for user access
+                    if public_url:
+                        download_url = f"{public_url}/api/v1/files/{file_id}/content"
+                    else:
+                        download_url = f"/api/v1/files/{file_id}/content"  # Relative URL
                     self._log(f"✅ Uploaded to OpenWebUI: {download_url}")
                     return download_url
                 else:
