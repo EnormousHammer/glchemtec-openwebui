@@ -742,8 +742,8 @@ class Filter:
             if export_file_info:
                 self._log(f"Found export_file_info from inlet metadata: {export_file_info.get('filename')}")
         
-        # Check if the assistant response already contains a download indicator
-        # This prevents duplicate processing
+        # Check if the assistant response already contains the actual download link (not just text)
+        # We need to check for the HTML anchor tag or data URL, not just "export is ready" text
         last_assistant_msg = None
         for msg in reversed(messages):
             if msg.get("role") == "assistant":
@@ -752,9 +752,10 @@ class Filter:
         
         if last_assistant_msg:
             assistant_content = self._extract_text_content(last_assistant_msg.get("content", ""))
-            # Check if export was already handled (look for our export markers)
-            if "Export is Ready" in assistant_content or "export is ready" in assistant_content or "Click to Download" in assistant_content:
-                self._log("Export already in assistant response, skipping outlet processing")
+            # Only skip if the actual download HTML is present (not just the text message)
+            # Look for the HTML anchor tag with download attribute, or data: URL
+            if '<a href="data:' in assistant_content or 'download="' in assistant_content:
+                self._log("Download link HTML already in assistant response, skipping outlet processing")
                 return body
         
         # If no metadata from inlet, check if this is an export request (fallback)
