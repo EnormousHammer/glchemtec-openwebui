@@ -557,60 +557,15 @@ class Filter:
     def _upload_to_openwebui(self, file_bytes: bytes, filename: str, mime_type: str, __user__: Optional[dict] = None) -> Optional[str]:
         """
         Upload file to OpenWebUI's native file system and return download URL.
-        Uses internal localhost URL to avoid self-referential request issues.
+        NOTE: This is disabled on Render because it causes self-referential HTTP requests
+        that can deadlock the server. The filter runs inside OpenWebUI, so calling
+        OpenWebUI's API from within causes issues.
         """
-        try:
-            # Use internal URL to avoid self-referential request deadlock
-            # OpenWebUI runs on port 8080 internally
-            internal_url = "http://127.0.0.1:8080"
-            public_url = self.valves.public_base_url or os.environ.get("WEBUI_URL", "") or os.environ.get("RENDER_EXTERNAL_URL", "")
-            
-            # OpenWebUI's file upload endpoint (internal)
-            upload_url = f"{internal_url}/api/v1/files/"
-            
-            # Get user token if available (needed for authenticated upload)
-            user_token = None
-            if __user__ and isinstance(__user__, dict):
-                user_token = __user__.get("token") or __user__.get("api_key")
-            
-            if not user_token:
-                self._log("No user token available for OpenWebUI upload")
-                return None
-            
-            # Prepare multipart form data
-            files = {
-                'file': (filename, io.BytesIO(file_bytes), mime_type)
-            }
-            
-            headers = {"Authorization": f"Bearer {user_token}"}
-            
-            self._log(f"Uploading {filename} ({len(file_bytes)} bytes) to OpenWebUI internal: {upload_url}")
-            
-            response = requests.post(upload_url, files=files, headers=headers, timeout=60)
-            
-            if response.status_code == 200:
-                result = response.json()
-                file_id = result.get("id")
-                if file_id:
-                    # Construct download URL using public URL for user access
-                    if public_url:
-                        download_url = f"{public_url}/api/v1/files/{file_id}/content"
-                    else:
-                        download_url = f"/api/v1/files/{file_id}/content"  # Relative URL
-                    self._log(f"✅ Uploaded to OpenWebUI: {download_url}")
-                    return download_url
-                else:
-                    self._log(f"Upload succeeded but no file ID returned: {result}")
-                    return None
-            else:
-                self._log(f"OpenWebUI upload failed: {response.status_code} - {response.text[:200]}")
-                return None
-                
-        except Exception as e:
-            self._log(f"OpenWebUI upload error: {e}")
-            import traceback
-            self._log(f"Traceback: {traceback.format_exc()}")
-            return None
+        # DISABLED - causes deadlock on Render (self-referential request)
+        # The filter runs inside OpenWebUI's process, so making HTTP requests
+        # to OpenWebUI's own API endpoints causes the server to wait for itself
+        self._log("OpenWebUI upload disabled (causes deadlock on Render)")
+        return None
 
     def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
         """
@@ -746,10 +701,14 @@ class Filter:
 
         # Check if we have export file info from inlet (metadata may not persist between inlet/outlet)
         export_file_info = None
+        self._log(f"Outlet body keys: {list(body.keys())}")
+        self._log(f"Outlet metadata: {body.get('metadata')}")
         if isinstance(body.get("metadata"), dict):
             export_file_info = body["metadata"].get("export_file")
             if export_file_info:
                 self._log(f"Found export_file_info from inlet metadata: {export_file_info.get('filename')}")
+        else:
+            self._log("No metadata dict in body - inlet metadata did not persist")
         
         # Check if the assistant response already contains the actual download link (not just text)
         # We need to check for the HTML anchor tag or data URL, not just "export is ready" text
@@ -769,6 +728,7 @@ class Filter:
         
         # If no metadata from inlet, check if this is an export request (fallback)
         if not export_file_info:
+            self._log("No export_file_info from metadata, checking for export request in user message...")
             last_user_msg = None
             for msg in reversed(messages):
                 if msg.get("role") == "user":
@@ -777,6 +737,7 @@ class Filter:
 
             if last_user_msg:
                 user_content = self._extract_text_content(last_user_msg.get("content", ""))
+                self._log(f"Outlet checking user message: '{user_content[:100]}...'")
                 export_format = self._detect_export_request(user_content)
                 
                 if export_format:
@@ -793,6 +754,12 @@ class Filter:
                             "size": export_result.get("size_bytes", 0)
                         }
                         self._log(f"Export file created (fallback): {export_file_info['filename']}")
+                    else:
+                        self._log(f"Export creation failed in outlet fallback")
+                else:
+                    self._log(f"No export pattern matched in outlet")
+            else:
+                self._log("No user message found in outlet")
         
         # If we have file info (from inlet), ensure download link is in the ASSISTANT response
         if export_file_info and messages:
